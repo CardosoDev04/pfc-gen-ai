@@ -1,0 +1,20 @@
+# Virtual Environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large files & dependencies
+*.log
+node_modules/
+playwright/driver/
+**/playwright/driver/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment variables
+.env
+output.html
