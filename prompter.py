@@ -1,5 +1,6 @@
 import ollama
 from bs4 import BeautifulSoup
+from web_fetcher import WebFetcher
 
 def extract_interactive_elements(html):
     soup = BeautifulSoup(html, "html.parser")
@@ -54,7 +55,12 @@ SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML c
 1. Only analyze actual HTML elements provided
 2. Return interactions in the format: ["Element Type", "Element Text (null if none)", "Action Type"]
 3. Do not hallucinate or make up elements
-4. Only extract from the HTML provided"""
+4. Only extract from the HTML provided
+5. Do not return any other text besides the requested interpretation
+6. The action of typing should be referred to as "Type", Selecting should be referred to as "Select", Clicking should be referred to as "Click", Hover should be referred to as "Hover"
+7. Element text refers to, for example, input placeholders, labels or button text
+8. Do not include any ordering or bullet points in your response, keep it to the format
+"""
 
 def extract_interactions(html):
     """Process a chunk of HTML through the LLM with proper prompting"""
@@ -86,6 +92,15 @@ def process_elements_with_llm(html, llm_function, max_chunk_size=1000):
         
     return results
 
-html_input = read_from_file("output.html")
-results = process_elements_with_llm(html_input, extract_interactions)
-print(results)
+def get_results(url):
+    fetcher = WebFetcher()
+    fetched = fetcher.extract_html(url)
+    fetcher.save_to_file(fetched, "output.html")
+    html_input = read_from_file("output.html")
+    results = process_elements_with_llm(html_input, extract_interactions)
+    
+    return results
+    
+if __name__ == "__main__":
+    results = get_results("https://saucedemo.com")
+    print(results)
