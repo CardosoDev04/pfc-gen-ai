@@ -60,6 +60,7 @@ SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML c
 6. The action of typing should be referred to as "Type", Selecting should be referred to as "Select", Clicking should be referred to as "Click", Hover should be referred to as "Hover"
 7. Element text refers to, for example, input placeholders, labels or button text
 8. Do not include any ordering or bullet points in your response, keep it to the format
+9. Each interaction should be an element of an array, and that array is what should be returned
 """
 
 def extract_interactions(html):
@@ -92,15 +93,27 @@ def process_elements_with_llm(html, llm_function, max_chunk_size=1000):
         
     return results
 
+def save_to_file(content: str | list, filename: str) -> None:
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            if isinstance(content, list):
+                content = '\n'.join(str(item) for item in content)
+            f.write(str(content))
+    except IOError as e:
+        print(f"Error writing to file: {e}")
+    except Exception as e:
+        print(f"Unexpected error while writing to file: {e}")
+
+        
 def get_results(url):
     fetcher = WebFetcher()
     fetched = fetcher.extract_html(url)
-    fetcher.save_to_file(fetched, "output.html")
+    save_to_file(fetched, "output.html")
     html_input = read_from_file("output.html")
     results = process_elements_with_llm(html_input, extract_interactions)
     
     return results
-    
+              
 if __name__ == "__main__":
     results = get_results("https://saucedemo.com")
-    print(results)
+    save_to_file(results, "results.md")
