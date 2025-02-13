@@ -1,0 +1,7 @@
+ [["button", "See details", "click"]]
+ [["button", "See details", "hover"], ["button", null, "click"]]
+ [["button", "See details", "click"]]
+ [["button", "See details", "hover"], ["button", null, "click"]]
+ [["button", null, "click"]]
+ [["button", "Life", "click"]]
+ [["button", null, "click"], ["input", null, "select"]]

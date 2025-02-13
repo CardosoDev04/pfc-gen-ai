@@ -1,6 +1,9 @@
 import ollama
 from bs4 import BeautifulSoup
 from web_fetcher import WebFetcher
+import random
+import string
+import os
 
 def extract_interactive_elements(html):
     soup = BeautifulSoup(html, "html.parser")
@@ -56,11 +59,13 @@ SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML c
 2. Return interactions in the format: ["Element Type", "Element Text (null if none)", "Action Type"]
 3. Do not hallucinate or make up elements
 4. Only extract from the HTML provided
-5. Do not return any other text besides the requested interpretation
-6. The action of typing should be referred to as "Type", Selecting should be referred to as "Select", Clicking should be referred to as "Click", Hover should be referred to as "Hover"
+5. Do not return any other text besides the requested interpretation, not even comments
+6. The action of typing should be referred to as "type", Selecting should be referred to as "select", Clicking should be referred to as "click", Hover should be referred to as "hover". Element Type should the be HTML element code name, exactly like it's written, in lowercase (for example, a, div, button, form, etc...). Action types and Element Types should be lowercase.
 7. Element text refers to, for example, input placeholders, labels or button text
 8. Do not include any ordering or bullet points in your response, keep it to the format
-9. Each interaction should be an element of an array, and that array is what should be returned
+9. You should only return one top level array with the interactions as it's elements. Not multiple arrays per line.
+10. Here is an example of a correct complete output: [["button", "Click Me", "click"], ["input", "Type here", "type"]]
+11. Here is an example of a incorrect complete output :  [["button", "See details", "click"]][["button", "See details", "click"]][["button", "See details", "click"]]
 """
 
 def extract_interactions(html):
@@ -115,5 +120,16 @@ def get_results(url):
     return results
               
 if __name__ == "__main__":
-    results = get_results("https://saucedemo.com")
-    save_to_file(results, "results.md")
+    url = input("URL: ").strip()
+    save_path = input("Path to save results (/results by default): ").strip()
+    if not save_path:
+        save_path = "results"
+    filename = input("Results file name (random by default): ").strip()
+    if not filename:
+        letters = string.ascii_lowercase
+        filename = ''.join(random.choice(letters) for i in range(12))
+    filename += '.md'
+    save_path += '/'
+    results = get_results(url)
+    os.makedirs(save_path, exist_ok=True)
+    save_to_file(results, save_path + filename)
