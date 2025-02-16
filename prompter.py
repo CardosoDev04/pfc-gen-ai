@@ -1,6 +1,7 @@
 import ollama
 from bs4 import BeautifulSoup
 from web_fetcher import WebFetcher
+from utils import Utils
 import random
 import string
 import os
@@ -46,17 +47,9 @@ def chunk_elements(text, max_size=1000):
         
     return chunks
 
-def read_from_file(filename: str) -> str:
-    try:
-        with open(filename, 'r', encoding='utf-8') as f:
-            return f.read()
-    except IOError as e:
-        print(f"Error reading file: {e}")
-        return ""
-
 SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML code and must extract all possible interactions, following these rules:
 1. Only analyze actual HTML elements provided
-2. Return interactions in the format: ["Element Type", "Element Text (null if none)", "Action Type"]
+2. Return interactions in the format: ["Element identifier (id, arialabel, etc...)","Element Type", "Element Text (null if none)", "Action Type"]
 3. Do not hallucinate or make up elements
 4. Only extract from the HTML provided
 5. Do not return any other text besides the requested interpretation, not even comments
@@ -64,8 +57,8 @@ SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML c
 7. Element text refers to, for example, input placeholders, labels or button text
 8. Do not include any ordering or bullet points in your response, keep it to the format
 9. You should only return one top level array with the interactions as it's elements. Not multiple arrays per line.
-10. Here is an example of a correct complete output: [["button", "Click Me", "click"], ["input", "Type here", "type"]]
-11. Here is an example of a incorrect complete output :  [["button", "See details", "click"]][["button", "See details", "click"]][["button", "See details", "click"]]
+10. Here is an example of a correct complete output: [["example-btn","button", "Click Me", "click"], ["password-input","input", "Type here", "type"]]
+11. Here is an example of a incorrect complete output :  [["example-btn","button", "See details", "click"]][["example-btn-2","button", "See details", "click"]][["example-btn-3","button", "See details", "click"]]
 """
 
 def extract_interactions(html):
@@ -98,23 +91,12 @@ def process_elements_with_llm(html, llm_function, max_chunk_size=1000):
         
     return results
 
-def save_to_file(content: str | list, filename: str) -> None:
-    try:
-        with open(filename, 'w', encoding='utf-8') as f:
-            if isinstance(content, list):
-                content = '\n'.join(str(item) for item in content)
-            f.write(str(content))
-    except IOError as e:
-        print(f"Error writing to file: {e}")
-    except Exception as e:
-        print(f"Unexpected error while writing to file: {e}")
-
         
 def get_results(url):
     fetcher = WebFetcher()
     fetched = fetcher.extract_html(url)
-    save_to_file(fetched, "output.html")
-    html_input = read_from_file("output.html")
+    Utils.save_to_file(fetched, "output.html")
+    html_input = Utils.read_from_file("output.html")
     results = process_elements_with_llm(html_input, extract_interactions)
     
     return results
@@ -132,4 +114,4 @@ if __name__ == "__main__":
     save_path += '/'
     results = get_results(url)
     os.makedirs(save_path, exist_ok=True)
-    save_to_file(results, save_path + filename)
+    Utils.save_to_file(results, save_path + filename)

@@ -1,0 +1,5 @@
+ [["button", "Let me hack!", "click"], ["button", "Book this room", "click"]] (Repeated 6 times)
+ [["button", null, "click"]]
+ [["button", "Book this room", "null"], ["button", "Book this room", "null"], ["button", "Book this room", "null"], ["button", "Submit", "null"], ["input", "Name", "type"], ["input", "Email", "type"], ["input", "Phone", "type"]]
+ [["input", "Subject", "type"], ["a", "Restful booker platform source code", "click"], ["a", "restful-booker-platform source", "click"], ["a", "build process in this public build pipeline", "click"], ["a", "Link to home page", "click"], ["a", "admin panel", "click"], ["a", "Link to RBP project", "click"]]
+ [["a", "Bug tracker", "click"], ["a", null, "click"], ["a", null, "click"], ["a", "Mark Winteringham", "click"], ["a", null, "click"], ["a", null, "click"], ["a", null, "click"]]
