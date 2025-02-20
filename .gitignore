@@ -18,3 +18,5 @@ playwright/driver/
 # Environment variables
 .env
 output.html
+
+.results/
