@@ -6,6 +6,8 @@ import random
 import string
 import os
 
+MODEL_NAME = "mistral:7b"
+
 def extract_interactive_elements(html):
     soup = BeautifulSoup(html, "html.parser")
     elements = []
@@ -51,14 +53,16 @@ SYSTEM_PROMPT = """You are an HTML interaction analyzer. You will receive HTML c
 1. Only analyze actual HTML elements provided
 2. Return interactions in the format: ["Element identifier (id, arialabel, etc...)","Element Type", "Element Text (null if none)", "Action Type"]
 3. Do not hallucinate or make up elements
-4. Only extract from the HTML provided
-5. Do not return any other text besides the requested interpretation, not even comments
-6. The action of typing should be referred to as "type", Selecting should be referred to as "select", Clicking should be referred to as "click", Hover should be referred to as "hover". Element Type should the be HTML element code name, exactly like it's written, in lowercase (for example, a, div, button, form, etc...). Action types and Element Types should be lowercase.
-7. Element text refers to, for example, input placeholders, labels or button text
-8. Do not include any ordering or bullet points in your response, keep it to the format
-9. You should only return one top level array with the interactions as it's elements. Not multiple arrays per line.
-10. Here is an example of a correct complete output: [["example-btn","button", "Click Me", "click"], ["password-input","input", "Type here", "type"]]
-11. Here is an example of a incorrect complete output :  [["example-btn","button", "See details", "click"]][["example-btn-2","button", "See details", "click"]][["example-btn-3","button", "See details", "click"]]
+4. Do make up element identifiers
+5. Only extract from the HTML provided
+6. Do not return any other text besides the requested interpretation, not even comments
+7. The action of typing should be referred to as "type", Selecting should be referred to as "select", Clicking should be referred to as "click", Hover should be referred to as "hover". Element Type should the be HTML element code name, exactly like it's written, in lowercase (for example, a, div, button, form, etc...). Action types and Element Types should be lowercase.
+8. Element text refers to, for example, input placeholders, labels or button text
+9. Do not include any ordering or bullet points in your response, keep it to the format
+10. You should only return one top level array with the interactions as it's elements. Not multiple arrays per line.
+11. Here is an example of a correct complete output: [["example-btn-id","button", "Click Me", "click"], ["password-input","input", "Type here", "type"]]
+12. Here is an example of a incorrect complete output:  [["example-btn-id","button", "See details", "click"]][["example-btn-2","button", "See details", "click"]][["example-btn-3","button", "See details", "click"]]
+13. If you are asked for the identifier of a button given a certain target action, respond according to the following example format: ["id": button-id", "text": "button text"]
 """
 
 def extract_interactions(html):
@@ -66,7 +70,7 @@ def extract_interactions(html):
     full_prompt = f"{SYSTEM_PROMPT}\n\nHTML Input:\n{html}\n\nExtract all possible interactions in the specified format:"
     
     response = ollama.chat(
-        model="mistral:7b",
+        model=MODEL_NAME,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"HTML Input:\n{html}"}
@@ -100,6 +104,17 @@ def get_results(url):
     results = process_elements_with_llm(html_input, extract_interactions)
     
     return results
+
+def get_element_by_action(results, target_action):
+    response = ollama.chat(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": target_action}
+        ]
+    )
+    return response["message"]["content"]
+    
               
 if __name__ == "__main__":
     url = input("URL: ").strip()
@@ -114,4 +129,6 @@ if __name__ == "__main__":
     save_path += '/'
     results = get_results(url)
     os.makedirs(save_path, exist_ok=True)
+    target_element_id = get_element_by_action(results, f"Out of the possible HTML interactions, what is the id of the HTML element that can be interacted with in order to get more information about the life of the company?\nHTML interactions available:{", ".join(results)}")
+    print(target_element_id)
     Utils.save_to_file(results, save_path + filename)
