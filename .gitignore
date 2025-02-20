@@ -19,4 +19,4 @@ playwright/driver/
 .env
 output.html
 
-.results/
+results/
