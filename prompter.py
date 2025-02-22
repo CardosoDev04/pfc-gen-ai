@@ -2,6 +2,7 @@ import ollama
 from bs4 import BeautifulSoup
 from web_fetcher import WebFetcher
 from utils import Utils
+from element_identifier import get_element_by_action
 import random
 import string
 import os
@@ -102,16 +103,6 @@ def get_results(url):
     results = process_elements_with_llm(html_input, extract_interactions)
     
     return results
-
-def get_element_by_action(results, target_action):
-    response = ollama.chat(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": target_action}
-        ]
-    )
-    return response["message"]["content"]
     
               
 if __name__ == "__main__":
