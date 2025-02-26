@@ -1,2 +1,5 @@
 .idea
 /genai-scraper.iml
+/genai-scraper/gradle/wrapper/gradle-wrapper.properties
+/genai-scraper/gradlew
+/genai-scraper/gradlew.bat
