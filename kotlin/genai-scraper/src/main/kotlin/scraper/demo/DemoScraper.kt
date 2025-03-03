@@ -4,6 +4,7 @@ import domain.classes.BookingOption
 import domain.interfaces.IDemoScraper
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
+import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
 import scraper.common.buildChromeDriver
 import java.time.Duration
@@ -24,7 +25,21 @@ class DemoScraper(private val driver: WebDriver): IDemoScraper {
     }
 
     override fun bookTrip(from: String, to: String, optionTitle: String) {
-        TODO("Not yet implemented")
+        val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
+
+        driver.get("http://localhost:5173/")
+        driver.findElement(By.id("origin-input")).sendKeys(from)
+        driver.findElement(By.id("destination-input")).sendKeys(to)
+        driver.findElement(By.id("search-button")).click()
+
+        webDriverWait.until(ExpectedConditions.presenceOfElementLocated(By.className("result")))
+
+        val targetItem = driver.findElements(By.cssSelector("div.result")).find { resultDiv ->
+            val titleElement = resultDiv.findElement(By.tagName("h1"))
+            titleElement.text == optionTitle
+        }
+
+        targetItem?.findElement(By.className("book-btn"))?.click()
     }
 }
 
@@ -34,4 +49,5 @@ fun main() {
 
     val options = scraper.getBookingOptions()
     println(options)
+    scraper.bookTrip("Lisboa", "Rome", "Item 3")
 }
