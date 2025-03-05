@@ -1,12 +1,12 @@
-package scraper.demo
+package demo
 
-import domain.classes.BookingOption
-import domain.interfaces.IDemoScraper
+import classes.BookingOption
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
-import scraper.common.buildChromeDriver
+import com.cardoso.common.buildChromeDriver
+import interfaces.IDemoScraper
 import java.time.Duration
 
 class DemoScraper(private val driver: WebDriver): IDemoScraper {
