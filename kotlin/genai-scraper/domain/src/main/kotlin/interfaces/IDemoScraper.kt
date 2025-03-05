@@ -1,6 +1,6 @@
-package domain.interfaces
+package interfaces
 
-import domain.classes.BookingOption
+import classes.BookingOption
 
 interface IDemoScraper {
     fun getBookingOptions(): List<BookingOption>
