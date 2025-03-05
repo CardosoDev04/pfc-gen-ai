@@ -6,21 +6,30 @@ import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
 import com.cardoso.common.buildChromeDriver
+import org.openqa.selenium.TimeoutException
+import snapshots.ISnapshotService
+import snapshots.SnapshotService
 import java.time.Duration
 
-class DemoScraper(private val driver: WebDriver): IDemoScraper {
+class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IDemoScraper {
     override fun getBookingOptions(): List<BookingOption> {
         val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
+        try {
+            driver.get("http://localhost:5173/")
 
-        driver.get("http://localhost:5173/")
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
 
-        driver.findElement(By.id("search-button")).click()
+            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
 
-        val optionElements = driver.findElements(By.id("item-title"))
+            val results = optionElements.map { BookingOption(it.text) }
 
-        val results = optionElements.map { it -> BookingOption(it.text) }
-
-        return results
+            return results
+        } catch (e: Exception) {
+            if(e is NoSuchElementException || e is TimeoutException) {
+                snapshotService.takeSnapshotAsFile(driver, "kotlin/genai-scraper/healthcheck/src/main/kotlin/snapshots/saved/demo_website/latest")
+            }
+            throw e
+        }
     }
 
     override fun bookTrip(from: String, to: String, optionTitle: String) {
@@ -43,10 +52,11 @@ class DemoScraper(private val driver: WebDriver): IDemoScraper {
 }
 
 fun main() {
-    val driver = buildChromeDriver()
-    val scraper = DemoScraper(driver)
+    val driver = buildChromeDriver(true)
+    val snapshotService = SnapshotService()
+    val scraper = DemoScraper(driver, snapshotService)
 
     val options = scraper.getBookingOptions()
     println(options)
-    scraper.bookTrip("Lisboa", "Rome", "Item 3")
+    // scraper.bookTrip("Lisboa", "Rome", "Item 3")
 }
