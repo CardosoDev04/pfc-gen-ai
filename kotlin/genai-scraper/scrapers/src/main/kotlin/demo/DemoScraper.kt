@@ -6,7 +6,6 @@ import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
 import com.cardoso.common.buildChromeDriver
-import interfaces.IDemoScraper
 import java.time.Duration
 
 class DemoScraper(private val driver: WebDriver): IDemoScraper {
