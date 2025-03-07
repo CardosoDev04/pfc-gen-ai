@@ -4,4 +4,4 @@ import domain.classes.LLM
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class OllamaChatRequest(val prompt: String, val model: LLM)
+data class OllamaGenerateRequest(val model: String, val prompt: String, val stream: Boolean)

@@ -2,8 +2,8 @@ package llm
 
 import domain.classes.LLM
 import domain.http.Uris
-import domain.http.ollama.requests.OllamaChatRequest
-import domain.http.ollama.responses.OllamaChatResponse
+import domain.http.ollama.requests.OllamaGenerateRequest
+import domain.http.ollama.responses.OllamaGenerateResponse
 import domain.http.ollama.responses.OllamaTagsResponse
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -21,11 +21,11 @@ class OllamaClient(
 ): LLMClient {
     private val mediaTypeJson = "application/json; charset=utf-8".toMediaType()
 
-    override suspend fun chat(ollamaChatRequest: OllamaChatRequest): OllamaChatResponse {
+    override suspend fun generate(ollamaChatRequest: OllamaGenerateRequest): OllamaGenerateResponse {
         val requestBody = json.encodeToString(ollamaChatRequest).toRequestBody(mediaTypeJson)
 
         val request = Request.Builder()
-            .url(baseUrl + Uris.Ollama.CHAT)
+            .url("http://localhost:11434/api/generate")
             .post(requestBody)
             .build()
 
@@ -33,7 +33,7 @@ class OllamaClient(
             val responseBody = response.body?.string() ?: throw IOException("Empty response body")
 
             if (!response.isSuccessful) throw IOException("Unexpected code $response")
-            json.decodeFromString<OllamaChatResponse>(responseBody)
+            json.decodeFromString<OllamaGenerateResponse>(responseBody)
         }
     }
 
@@ -54,12 +54,11 @@ class OllamaClient(
 
 fun main() {
     val httpClient = OkHttpClient()
-    val json = Json { ignoreUnknownKeys = true }
-    val client = OllamaClient(httpClient, json)
+    val client = OllamaClient(httpClient)
 
     runBlocking {
-        val request = OllamaChatRequest("What is your name?", LLM.Mistral7B)
-        val response = client.chat(request)
+        val request = OllamaGenerateRequest(LLM.Mistral7B.modelName, "What is your name?",false)
+        val response = client.generate(request)
         println(response.response)
     }
 }
