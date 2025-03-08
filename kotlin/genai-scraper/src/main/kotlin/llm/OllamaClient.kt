@@ -25,7 +25,7 @@ class OllamaClient(
         val requestBody = json.encodeToString(ollamaChatRequest).toRequestBody(mediaTypeJson)
 
         val request = Request.Builder()
-            .url("http://localhost:11434/api/generate")
+            .url(baseUrl + Uris.Ollama.GENERATE)
             .post(requestBody)
             .build()
 
