@@ -34,22 +34,30 @@ class WebInteractor{
         buttons.forEach { println(it.text) }
         inputButtons.forEach { println(it.getDomAttribute("value")) }
 
-        println("Links:")
-        links.forEach { println(it.getDomAttribute("href")) }
+        println("\nLinks:")
+        links.forEach {
+            var linkButton : String? = ""
+            if(it.accessibleName == "") {
+                linkButton = "Unknown name, "
+            } else  linkButton = it.accessibleName
+            val href = it.getAttribute("href")
 
-        println("Input Fields:")
+            println("Link name: $linkButton, Href: $href " )
+        }
+
+        println("\nInput Fields:")
         inputs.forEach { println(it.getDomAttribute("name")) }
 
-        print("TextAreas:")
+        println("\nTextAreas:")
         textareas.forEach { println(it.getDomAttribute("name")) }
 
-        println("Selects:")
+        println("\nSelects:")
         selects.forEach { println(it.getDomAttribute("name")) }
 
-        println("Forms:")
+        println("\nForms:")
         forms.forEach { println(it.getDomAttribute("action")) }
 
-        return "Page analysis complete"
+        return "\nPage analysis complete"
 
 
 
@@ -58,8 +66,8 @@ class WebInteractor{
 
 fun main() {
     val webInteractor = WebInteractor()
-    val html = webInteractor.getPageHTML("http://www.google.com/")
-    println(html)
+    webInteractor.getInteractiveElementsFromHTML("https://parabank.parasoft.com/parabank/index.html")
+
 }
 
 
