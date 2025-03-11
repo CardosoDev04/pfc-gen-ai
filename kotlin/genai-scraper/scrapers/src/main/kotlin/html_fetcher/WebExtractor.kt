@@ -1,13 +1,15 @@
+package html_fetcher
+
+import com.cardoso.common.buildChromeDriver
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.WebElement
-import org.openqa.selenium.chrome.ChromeDriver
 import java.time.Duration
 
 
-class WebInteractor{
+class WebExtractor{
 
-    val driver : WebDriver = ChromeDriver()
+    val driver : WebDriver = buildChromeDriver(true)
 
     fun getPageHTML(url: String): String {
         driver.get(url)
@@ -65,8 +67,8 @@ class WebInteractor{
 }
 
 fun main() {
-    val webInteractor = WebInteractor()
-    webInteractor.getInteractiveElementsFromHTML("https://parabank.parasoft.com/parabank/index.html")
+    val webExtractor = WebExtractor()
+    webExtractor.getInteractiveElementsFromHTML("https://parabank.parasoft.com/parabank/index.html")
 
 }
 
