@@ -1,6 +1,6 @@
 package demo
 
-import classes.BookingOption
+import classes.data.BookingOption
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions

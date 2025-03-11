@@ -1,6 +1,6 @@
 package demo
 
-import classes.BookingOption
+import classes.data.BookingOption
 
 interface IDemoScraper {
     fun getBookingOptions(): List<BookingOption>
