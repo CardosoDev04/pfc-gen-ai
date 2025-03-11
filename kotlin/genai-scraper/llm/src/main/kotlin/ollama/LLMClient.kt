@@ -1,4 +1,4 @@
-package llm
+package ollama
 
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.http.ollama.responses.OllamaGenerateResponse
