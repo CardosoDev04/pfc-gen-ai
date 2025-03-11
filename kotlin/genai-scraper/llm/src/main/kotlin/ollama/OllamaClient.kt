@@ -1,4 +1,4 @@
-package llm
+package ollama
 
 import domain.classes.LLM
 import domain.http.Uris
