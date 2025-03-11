@@ -18,7 +18,7 @@ class OllamaClient(
     private val httpClient: OkHttpClient,
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val baseUrl: String = "http://localhost:11434"
-): LLMClient {
+): ILLMClient {
     private val mediaTypeJson = "application/json; charset=utf-8".toMediaType()
 
     override suspend fun generate(ollamaChatRequest: OllamaGenerateRequest): OllamaGenerateResponse {
@@ -57,7 +57,7 @@ fun main() {
     val client = OllamaClient(httpClient)
 
     runBlocking {
-        val request = OllamaGenerateRequest(LLM.Mistral7B.modelName, "What is your name?",false)
+        val request = OllamaGenerateRequest(LLM.Mistral7B.modelName, "","What is your name?",stream=false, raw=true)
         val response = client.generate(request)
         println(response.response)
     }
