@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    kotlin("plugin.serialization") version "2.1.10"
 }
 
 group = "com.cardoso-solutions"
@@ -11,8 +10,8 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":domain"))
     testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 }
 
 tasks.test {
