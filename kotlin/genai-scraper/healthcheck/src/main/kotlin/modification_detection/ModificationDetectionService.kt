@@ -3,16 +3,15 @@ package modification_detection
 import classes.data.Element
 import classes.data.ElementTypes
 import classes.service_model.Modification
-import domain.modification.requests.ModificationRequest
 import domain.classes.LLM
 import domain.http.ollama.requests.OllamaGenerateRequest
-import domain.http.ollama.responses.OllamaGenerateResponse
+import domain.modification.requests.ModificationRequest
 import domain.prompts.GET_MODIFICATION_PROMPT
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
-import ollama.ILLMClient
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import ollama.ILLMClient
 import ollama.OllamaClient
 
 class ModificationDetectionService(
