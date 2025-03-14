@@ -1,18 +1,28 @@
 package modification_detection
 
+import classes.data.BookingOption
 import classes.data.Element
 import classes.data.ElementTypes
 import classes.service_model.Modification
 import domain.classes.LLM
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
+import domain.modification.requests.ScraperUpdateRequest
+import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.GET_MODIFICATION_PROMPT
+import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import ollama.ILLMClient
 import ollama.OllamaClient
+import org.openqa.selenium.By
+import org.openqa.selenium.TimeoutException
+import org.openqa.selenium.support.ui.ExpectedConditions
+import org.openqa.selenium.support.ui.WebDriverWait
+import java.time.Duration
 
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
@@ -35,6 +45,24 @@ class ModificationDetectionService(
 
         return Modification(modifiedElement, alternativeElement)
     }
+
+    override suspend fun modifyScript(oldScript: String, modification: Modification): String {
+        val scraperUpdateRequest = ScraperUpdateRequest(modification.old.toString(), modification.new.toString(), oldScript)
+        val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
+
+        val ollamaRequest = OllamaGenerateRequest(
+            model = LLM.Mistral7B.modelName,
+            system = SCRAPER_UPDATE_PROMPT,
+            prompt = scraperUpdateRequestJson,
+            stream = false,
+            raw = false
+        )
+
+        val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
+        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+
+        return updateScriptResponse.updatedScript
+    }
 }
 
 
@@ -43,13 +71,13 @@ fun main() {
         val httpClient = OkHttpClient()
         val llmClient = OllamaClient(httpClient)
         val service = ModificationDetectionService(llmClient)
-        val modifiedElement = Element("BUTTON", "button.btn-xs", "Sign up")
-        val newElements = listOf(
-            Element(ElementTypes.TEXTAREA.name, "textarea.comments", "Comments"),
-            Element(ElementTypes.BUTTON.name, "link.link-register", "Register"),
-            Element(ElementTypes.HEADING.name, "h2.h2-title", "Register an account.")
-        )
-        val modification = service.getModification(modifiedElement, newElements)
-        println(modification)
+        val modification = Modification("search-button", "search-btn")
+        val oldScript = "driver.get(\"http://localhost:5173/\")\n" +
+                "webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id(\"search-button\"))).click()\n" +
+                "val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id(\"item-title\")))\n" +
+                "val results = optionElements.map { BookingOption(it.text) }"
+        val newScript = service.modifyScript(oldScript, modification)
+
+        print(newScript)
     }
 }
