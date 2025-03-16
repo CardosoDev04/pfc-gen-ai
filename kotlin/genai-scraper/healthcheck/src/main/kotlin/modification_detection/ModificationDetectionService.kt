@@ -7,6 +7,7 @@ import classes.service_model.Modification
 import domain.classes.LLM
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
+import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.GET_MODIFICATION_PROMPT
@@ -27,6 +28,23 @@ import java.time.Duration
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
 ) : IModificationDetectionService {
+    override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
+        val missingElementsRequest = OllamaGenerateRequest(
+            model = LLM.Mistral7B.modelName,
+            system = GET_MISSING_ELEMENTS_PROMPT,
+            prompt = """
+                BEFORE:
+                $previousHTMLState
+                AFTER:
+                $newHTMLState
+            """.trimIndent(),
+            stream = false,
+            raw = false
+        )
+        val missingElementsResponseJson = llmClient.generate(missingElementsRequest).response
+        return Json.decodeFromString<List<Element>>(missingElementsResponseJson)
+    }
+
     override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification {
         val modifiedElementJson = Json.encodeToString(Element.serializer(), modifiedElement)
         val newElementsJson = Json.encodeToString(ListSerializer(Element.serializer()), newElements)
