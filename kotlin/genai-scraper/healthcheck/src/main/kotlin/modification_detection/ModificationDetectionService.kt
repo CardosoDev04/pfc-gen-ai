@@ -1,10 +1,8 @@
 package modification_detection
 
-import classes.data.BookingOption
 import classes.data.Element
-import classes.data.ElementTypes
+import classes.llm.LLM
 import classes.service_model.Modification
-import domain.classes.LLM
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
@@ -14,16 +12,10 @@ import domain.prompts.GET_MODIFICATION_PROMPT
 import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import ollama.ILLMClient
 import ollama.OllamaClient
-import org.openqa.selenium.By
-import org.openqa.selenium.TimeoutException
-import org.openqa.selenium.support.ui.ExpectedConditions
-import org.openqa.selenium.support.ui.WebDriverWait
-import java.time.Duration
 
 class ModificationDetectionService(
     private val llmClient: ILLMClient,

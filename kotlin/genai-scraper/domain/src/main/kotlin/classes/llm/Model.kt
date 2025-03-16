@@ -1,4 +1,4 @@
-package domain.classes
+package classes.llm
 
 import kotlinx.serialization.Serializable
 

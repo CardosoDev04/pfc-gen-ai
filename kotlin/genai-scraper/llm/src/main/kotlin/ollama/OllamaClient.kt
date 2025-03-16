@@ -1,6 +1,6 @@
 package ollama
 
-import domain.classes.LLM
+import classes.llm.LLM
 import domain.http.Uris
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.http.ollama.responses.OllamaGenerateResponse

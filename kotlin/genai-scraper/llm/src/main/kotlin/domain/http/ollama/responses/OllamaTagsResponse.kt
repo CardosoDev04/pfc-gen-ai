@@ -1,6 +1,6 @@
 package domain.http.ollama.responses
 
-import domain.classes.Model
+import classes.llm.Model
 import kotlinx.serialization.Serializable
 
 @Serializable
