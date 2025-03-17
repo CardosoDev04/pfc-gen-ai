@@ -5,9 +5,9 @@ import classes.llm.LLM
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
-import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
+import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
 import domain.prompts.GET_MODIFICATION_PROMPT
 import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
