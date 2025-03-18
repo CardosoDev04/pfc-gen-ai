@@ -13,13 +13,7 @@ class WebExtractor {
 
     private val driver: WebDriver = buildChromeDriver(true)
 
-    fun getPageHTML(url: String): String {
-        driver.get(url)
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
-        return driver.pageSource ?: ""
-    }
-
-    fun WebElement.getCssSelector(driver: WebDriver, element: WebElement): String {
+    fun getCssSelector(driver: WebDriver, element: WebElement): String {
         val jsScript = """
         function getCssSelector(el) {
             if (!(el instanceof Element)) return;
@@ -66,7 +60,7 @@ class WebExtractor {
             elements.add(
                 Element(
                     "button",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.text
                 )
             )
@@ -75,7 +69,7 @@ class WebExtractor {
             elements.add(
                 Element(
                     "inputButton",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.getDomAttribute("value") ?: ""
                 )
             )
@@ -83,7 +77,7 @@ class WebExtractor {
         links.forEach {
             elements.add(
                 Element(
-                    "link", it.getCssSelector(driver, it),
+                    "link", getCssSelector(driver, it),
                     (it.accessibleName ?: { "Unknown name" }).toString()
                 )
             )
@@ -92,7 +86,7 @@ class WebExtractor {
             elements.add(
                 Element(
                     "input",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.getDomAttribute("name") ?: ""
                 )
             )
@@ -101,7 +95,7 @@ class WebExtractor {
             elements.add(
                 Element(
                     "textarea",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.getDomAttribute("name") ?: ""
                 )
             )
@@ -110,7 +104,7 @@ class WebExtractor {
             elements.add(
                 Element(
                     "select",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.getDomAttribute("name") ?: ""
                 )
             )
@@ -119,13 +113,11 @@ class WebExtractor {
             elements.add(
                 Element(
                     "form",
-                    it.getCssSelector(driver, it),
+                    getCssSelector(driver, it),
                     it.getDomAttribute("action") ?: ""
                 )
             )
         }
-
-
         return elements
     }
 }
