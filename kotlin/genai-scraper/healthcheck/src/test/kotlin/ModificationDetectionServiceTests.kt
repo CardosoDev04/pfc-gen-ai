@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ModificationDetectionServiceTests {
-    private val mds = ModificationDetectionService(ollamaClient)
-
     @Test
     fun `getMissingElements of html form with missing submit button`(): Unit = runBlocking {
             // Given: Two HTML document and the second one not having a submit button
@@ -302,5 +300,6 @@ class ModificationDetectionServiceTests {
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .build()
         private val ollamaClient = OllamaClient(httpClient)
+        private val mds = ModificationDetectionService(ollamaClient)
     }
 }
