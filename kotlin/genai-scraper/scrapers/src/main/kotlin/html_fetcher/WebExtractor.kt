@@ -42,8 +42,8 @@ class WebExtractor {
         return (driver as JavascriptExecutor).executeScript(jsScript, element) as String
     }
 
-    fun getInteractiveElementsHTML(url: String): List<Element> {
-        driver.get(url)
+    fun getInteractiveElementsHTML(html: String): List<Element> {
+        driver.get("data:text/html;charset=utf-8,$html")
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
 
         val elements = mutableListOf<Element>()
@@ -124,7 +124,7 @@ class WebExtractor {
 
 fun main() {
     val webExtractor = WebExtractor()
-    val elements = webExtractor.getInteractiveElementsHTML("https://www.google.pt")
+    val elements = webExtractor.getInteractiveElementsHTML("")
 
     elements.forEach { element ->
         println("Type: ${element.type}, CSS Selector: ${element.cssSelector}, Text: ${element.text}")

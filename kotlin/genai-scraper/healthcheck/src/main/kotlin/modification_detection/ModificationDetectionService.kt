@@ -16,25 +16,22 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import ollama.ILLMClient
 import ollama.OllamaClient
+import html_fetcher.WebExtractor
 
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
 ) : IModificationDetectionService {
     override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
-        val missingElementsRequest = OllamaGenerateRequest(
-            model = LLM.Mistral7B.modelName,
-            system = GET_MISSING_ELEMENTS_PROMPT,
-            prompt = """
-                BEFORE:
-                $previousHTMLState
-                AFTER:
-                $newHTMLState
-            """.trimIndent(),
-            stream = false,
-            raw = false
-        )
-        val missingElementsResponseJson = llmClient.generate(missingElementsRequest).response
-        return Json.decodeFromString<List<Element>>(missingElementsResponseJson)
+        val webExtractor = WebExtractor()
+
+        val previousElements = webExtractor.getInteractiveElementsHTML(previousHTMLState)
+        val newElements = webExtractor.getInteractiveElementsHTML(newHTMLState)
+
+        return previousElements.filterNot { previousElement ->
+            newElements.any { newElement ->
+                previousElement.cssSelector == newElement.cssSelector
+            }
+        }
     }
 
     override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification {
@@ -73,6 +70,8 @@ class ModificationDetectionService(
 
         return updateScriptResponse.updatedScript
     }
+
+
 }
 
 
