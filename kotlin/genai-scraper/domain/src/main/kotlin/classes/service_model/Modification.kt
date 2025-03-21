@@ -1,3 +1,3 @@
 package classes.service_model
 
-data class Modification(val old: Any, val new: Any)
+data class Modification<T>(val old: T, val new: T)
