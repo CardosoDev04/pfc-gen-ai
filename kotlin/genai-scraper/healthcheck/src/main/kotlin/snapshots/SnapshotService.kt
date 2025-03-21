@@ -1,5 +1,6 @@
 package snapshots
 
+import domain.model.classes.data.Snapshot
 import org.openqa.selenium.OutputType
 import org.openqa.selenium.TakesScreenshot
 import org.openqa.selenium.WebDriver
@@ -20,5 +21,10 @@ class SnapshotService: ISnapshotService {
         driver.pageSource?.let { htmlFile.writeText(it) }
 
         return destFile
+    }
+
+    override fun getSnapshot(htmlPath: String): Snapshot {
+        val htmlFile = File(htmlPath)
+        return Snapshot(htmlFile)
     }
 }
