@@ -7,26 +7,26 @@ const val SCRAPER_UPDATE_PROMPT = """
     ## Input
     You will receive:
         - The complete original Selenium scraper code that needs to be updated.
-        - Information about the selector change:
-            - The old selector that no longer works
-            - The new selector that should be used instead
+        - Information about the selector changes:
+            - The old selectors that no longer works
+            - The new selectors that should be used instead
     
     ## Your Task
-    1. Analyze the provided Selenium script carefully to understand its functionality, especially focusing on how the old selector is used
-    2. Identify all instances where the old selector appears in the code
-    3. Replace the old selector with the new selector, ensuring that:
-        - All instances of the old selector are updated
+    1. Analyze the provided Selenium script carefully to understand its functionality, especially focusing on how the old selectors were used
+    2. Identify all instances where the old selectors appear in the code
+    3. Replace the old selectors with the new selectors, ensuring that:
+        - All instances of the old selectors are updated
         - The replacement maintains the same functionality and logic
-        - Any code that depends on the old selector is updated appropriately
-    4. If the change in selector requires additional modifications (like changes in waiting conditions, element interaction methods, etc.), implement those changes
+        - Any code that depends on the old selectors are updated appropriately
+    4. If the change in selectors requires additional modifications (like changes in waiting conditions, element interaction methods, etc.), implement those changes
     5. Return the COMPLETE updated script with all necessary modifications - not just the changes or a partial script
     
     ## Guidelines for Script Repair
     - Preserve the overall structure and functionality of the original script
-    - Make only the changes necessary to accommodate the new selector
-    - If the selector change requires different handling methods (e.g., changing from ID to XPath), update the corresponding functions appropriately
-    - If the script uses explicit waits for elements, update the wait conditions to match the new selector
-    - If the script includes error handling for element not found, update the error handling to use the new selector
+    - Make only the changes necessary to accommodate the new selectors
+    - If the selector changes require different handling methods (e.g., changing from ID to XPath), update the corresponding functions appropriately
+    - If the script uses explicit waits for elements, update the wait conditions to match the new selectors
+    - If the script includes error handling for element not found, update the error handling to use the new selectors
     - Ensure the script continues to handle edge cases as in the original version
     
     ## Response Format
@@ -36,10 +36,19 @@ const val SCRAPER_UPDATE_PROMPT = """
     
     ### Example Input
     {
-        "oldSelector": "submit-button"
-        "newSelector": "submit-btn"
+        "selector_changes": [
+            {
+                "oldSelector": "submit-button",
+                "newSelector": "submit-btn"
+            },
+            {
+                "oldSelector": "name",
+                "newSelector": "name-input"
+            }
+        ],
         "script": "from selenium import webdriver\nfrom selenium.webdriver.common.by import By\n\n# Initialize the webdriver\ndriver = webdriver.Chrome()\ndriver.get(\"https://example.com/form\")\n\n# Fill out form\nname_field = driver.find_element(By.ID, \"name\")\nname_field.send_keys(\"John Doe\")\n\n# Click submit button using the old selector\nsubmit = driver.find_element(By.ID, \"submit-button\")\nsubmit.click()\n\n# Wait and close\ndriver.implicitly_wait(5)\nprint(\"Form submitted successfully\")\ndriver.quit()"
     }
+
     
     ### Example Output
     {
