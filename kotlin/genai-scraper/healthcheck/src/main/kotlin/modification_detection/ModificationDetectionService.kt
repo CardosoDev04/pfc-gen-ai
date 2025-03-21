@@ -2,6 +2,7 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.LLM
+import classes.service_model.CssSelectorModification
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
@@ -37,7 +38,7 @@ class ModificationDetectionService(
         return Json.decodeFromString<List<Element>>(missingElementsResponseJson)
     }
 
-    override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification {
+    override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification<Element> {
         val modifiedElementJson = Json.encodeToString(Element.serializer(), modifiedElement)
         val newElementsJson = Json.encodeToString(ListSerializer(Element.serializer()), newElements)
         val modificationRequest = ModificationRequest(modifiedElementJson, newElementsJson)
@@ -56,21 +57,33 @@ class ModificationDetectionService(
         return Modification(modifiedElement, alternativeElement)
     }
 
-    override suspend fun modifyScript(oldScript: String, modification: Modification): String {
-        val scraperUpdateRequest = ScraperUpdateRequest(modification.old.toString(), modification.new.toString(), oldScript)
+    override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
+        val cssSelectorModification = CssSelectorModification(modification.old, modification.new)
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(cssSelectorModification), oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
+        return queryLLM(scraperUpdateRequestJson)
+    }
+
+    override suspend fun modifyScript(oldScript: String, modifications: List<Modification<String>>): String {
+        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old, m.new) }
+        val scraperUpdateRequest = ScraperUpdateRequest(cssSelectorModifications, oldScript)
+        val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
+
+        return queryLLM(scraperUpdateRequestJson)
+    }
+
+    private suspend fun queryLLM(updateRequestJson: String): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = LLM.Mistral7B.modelName,
             system = SCRAPER_UPDATE_PROMPT,
-            prompt = scraperUpdateRequestJson,
+            prompt = updateRequestJson,
             stream = false,
             raw = false
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
         val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
-
         return updateScriptResponse.updatedScript
     }
 }
