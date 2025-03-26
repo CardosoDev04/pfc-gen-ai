@@ -1,13 +1,24 @@
 package snapshots
 
-import domain.model.classes.data.Snapshot
+import classes.service_model.Snapshot
 import org.openqa.selenium.OutputType
 import org.openqa.selenium.TakesScreenshot
 import org.openqa.selenium.WebDriver
 import java.io.File
 import java.nio.file.Files
 
+/**
+ * A service for taking and managing snapshots of web pages.
+ */
 class SnapshotService: ISnapshotService {
+
+    /**
+     * Takes a snapshot of the current state of the web page and saves it as a file.
+     *
+     * @param driver The WebDriver instance used to take the snapshot.
+     * @param path The path where the snapshot file will be saved.
+     * @return The file containing the snapshot.
+     */
     override fun takeSnapshotAsFile(driver: WebDriver, path: String): File {
         val destFile = File("$path/screenshot.png")
         destFile.parentFile.mkdirs()
@@ -23,6 +34,12 @@ class SnapshotService: ISnapshotService {
         return destFile
     }
 
+    /**
+     * Retrieves a snapshot from the given HTML file path.
+     *
+     * @param htmlPath The path to the HTML file.
+     * @return The Snapshot object containing the HTML file.
+     */
     override fun getSnapshot(htmlPath: String): Snapshot {
         val htmlFile = File(htmlPath)
         return Snapshot(htmlFile)

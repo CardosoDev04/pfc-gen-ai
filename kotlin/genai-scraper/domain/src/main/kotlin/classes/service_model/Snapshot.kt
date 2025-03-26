@@ -1,4 +1,4 @@
-package domain.model.classes.data
+package classes.service_model
 
 import java.io.File
 

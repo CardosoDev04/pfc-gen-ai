@@ -18,9 +18,22 @@ import okhttp3.OkHttpClient
 import ollama.ILLMClient
 import ollama.OllamaClient
 
+/**
+ * A service for detecting modifications in HTML and updating scraper scripts.
+ *
+ * @property llmClient The client for interacting with the LLM.
+ */
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
 ) : IModificationDetectionService {
+
+    /**
+     * Gets the missing elements between the previous and new HTML states.
+     *
+     * @param previousHTMLState The previous HTML state.
+     * @param newHTMLState The new HTML state.
+     * @return A list of missing elements.
+     */
     override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
         val missingElementsRequest = OllamaGenerateRequest(
             model = LLM.Mistral7B.modelName,
@@ -38,6 +51,13 @@ class ModificationDetectionService(
         return Json.decodeFromString<List<Element>>(missingElementsResponseJson)
     }
 
+    /**
+     * Gets the modification for a modified element.
+     *
+     * @param modifiedElement The modified element.
+     * @param newElements The new elements.
+     * @return The modification for the element.
+     */
     override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification<Element> {
         val modifiedElementJson = Json.encodeToString(Element.serializer(), modifiedElement)
         val newElementsJson = Json.encodeToString(ListSerializer(Element.serializer()), newElements)
@@ -57,6 +77,13 @@ class ModificationDetectionService(
         return Modification(modifiedElement, alternativeElement)
     }
 
+    /**
+     * Modifies the script based on a single modification.
+     *
+     * @param oldScript The old script.
+     * @param modification The modification to apply.
+     * @return The modified script.
+     */
     override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
         val cssSelectorModification = CssSelectorModification(modification.old, modification.new)
         val scraperUpdateRequest = ScraperUpdateRequest(listOf(cssSelectorModification), oldScript)
@@ -65,14 +92,27 @@ class ModificationDetectionService(
         return queryLLM(scraperUpdateRequestJson)
     }
 
-    override suspend fun modifyScript(oldScript: String, modifications: List<Modification<String>>): String {
-        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old, m.new) }
+    /**
+     * Modifies the script based on a list of modifications.
+     *
+     * @param oldScript The old script.
+     * @param modifications The list of modifications to apply.
+     * @return The modified script.
+     */
+    override suspend fun modifyScript(oldScript: String, modifications: List<Modification<Element>>): String {
+        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old.cssSelector, m.new.cssSelector) }
         val scraperUpdateRequest = ScraperUpdateRequest(cssSelectorModifications, oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
     }
 
+    /**
+     * Queries the LLM with the update request JSON.
+     *
+     * @param updateRequestJson The update request JSON.
+     * @return The updated script.
+     */
     private suspend fun queryLLM(updateRequestJson: String): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = LLM.Mistral7B.modelName,
