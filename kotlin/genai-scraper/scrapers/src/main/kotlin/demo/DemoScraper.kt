@@ -6,8 +6,8 @@ import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
 import com.cardoso.common.buildChromeDriver
+import com.cardoso.snapshots.ISnapshotService
 import org.openqa.selenium.TimeoutException
-import snapshots.ISnapshotService
 import snapshots.SnapshotService
 import java.time.Duration
 

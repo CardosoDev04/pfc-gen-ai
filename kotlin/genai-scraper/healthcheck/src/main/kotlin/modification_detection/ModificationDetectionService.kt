@@ -79,14 +79,44 @@ fun main() {
     runBlocking {
         val httpClient = OkHttpClient()
         val llmClient = OllamaClient(httpClient)
-        val service = ModificationDetectionService(llmClient)
-        val modification = Modification("search-button", "search-btn")
-        val oldScript = "driver.get(\"http://localhost:5173/\")\n" +
-                "webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id(\"search-button\"))).click()\n" +
-                "val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id(\"item-title\")))\n" +
-                "val results = optionElements.map { BookingOption(it.text) }"
-        val newScript = service.modifyScript(oldScript, modification)
 
-        print(newScript)
+
+        val oldHTML = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>First HTML</title>
+            </head>
+            <body>
+                <button id="button1">Button 1</button>
+                <button id="button2">Button 2</button>
+                <a href="#" id="link1">Link 1</a>
+                <input type="text" id="input1" />
+                <textarea id="textarea1"></textarea>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val newHTML = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Second HTML</title>
+            </head>
+            <body>
+                <button id="button1">Button 1</button>
+                <a href="#" id="link1">Link 1</a>
+                <input type="text" id="input1" />
+                <textarea id="textarea1"></textarea>
+            </body>
+            </html>
+        """.trimIndent()
+        val missingElements = ModificationDetectionService(llmClient).getMissingElements(oldHTML, newHTML)
+
+        print(missingElements)
     }
 }

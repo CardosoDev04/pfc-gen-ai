@@ -1,5 +1,6 @@
 package snapshots
 
+import com.cardoso.snapshots.ISnapshotService
 import org.openqa.selenium.OutputType
 import org.openqa.selenium.TakesScreenshot
 import org.openqa.selenium.WebDriver
