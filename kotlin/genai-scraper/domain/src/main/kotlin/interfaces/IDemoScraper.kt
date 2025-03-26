@@ -1,4 +1,4 @@
-package demo
+package interfaces
 
 import classes.data.BookingOption
 

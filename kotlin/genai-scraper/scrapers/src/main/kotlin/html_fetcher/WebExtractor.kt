@@ -2,6 +2,7 @@ package html_fetcher
 
 import classes.data.Element
 import com.cardoso.common.buildChromeDriver
+import org.jsoup.Jsoup
 import org.openqa.selenium.By
 import org.openqa.selenium.JavascriptExecutor
 import org.openqa.selenium.WebDriver
@@ -43,82 +44,16 @@ class WebExtractor {
     }
 
     fun getInteractiveElementsHTML(html: String): List<Element> {
-        driver.get("data:text/html;charset=utf-8,$html")
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+        val document = Jsoup.parse(html)
+        val selectors = listOf("a", "button", "input", "select", "textarea", "label", "[onclick]", "[tabindex]", "[role=button]", "[role=link]")
 
-        val elements = mutableListOf<Element>()
-
-        val buttons: List<WebElement> = driver.findElements(By.tagName("button"))
-        val inputButtons: List<WebElement> = driver.findElements(By.xpath("//input[@type='submit' or @type='button']"))
-        val links: List<WebElement> = driver.findElements(By.tagName("a"))
-        val inputs: List<WebElement> = driver.findElements(By.tagName("input"))
-        val textAreas: List<WebElement> = driver.findElements(By.tagName("textarea"))
-        val selects: List<WebElement> = driver.findElements(By.tagName("select"))
-        val forms: List<WebElement> = driver.findElements(By.tagName("form"))
-
-        buttons.forEach {
-            elements.add(
-                Element(
-                    "button",
-                    getCssSelector(driver, it),
-                    it.text
-                )
+        return document.select(selectors.joinToString(", ")).map { element ->
+            Element(
+                type = element.tagName(),
+                cssSelector = element.cssSelector(),
+                text = element.ownText().trim()
             )
         }
-        inputButtons.forEach {
-            elements.add(
-                Element(
-                    "inputButton",
-                    getCssSelector(driver, it),
-                    it.getDomAttribute("value") ?: ""
-                )
-            )
-        }
-        links.forEach {
-            elements.add(
-                Element(
-                    "link", getCssSelector(driver, it),
-                    (it.accessibleName ?: { "Unknown name" }).toString()
-                )
-            )
-        }
-        inputs.forEach {
-            elements.add(
-                Element(
-                    "input",
-                    getCssSelector(driver, it),
-                    it.getDomAttribute("name") ?: ""
-                )
-            )
-        }
-        textAreas.forEach {
-            elements.add(
-                Element(
-                    "textarea",
-                    getCssSelector(driver, it),
-                    it.getDomAttribute("name") ?: ""
-                )
-            )
-        }
-        selects.forEach {
-            elements.add(
-                Element(
-                    "select",
-                    getCssSelector(driver, it),
-                    it.getDomAttribute("name") ?: ""
-                )
-            )
-        }
-        forms.forEach {
-            elements.add(
-                Element(
-                    "form",
-                    getCssSelector(driver, it),
-                    it.getDomAttribute("action") ?: ""
-                )
-            )
-        }
-        return elements
     }
 }
 

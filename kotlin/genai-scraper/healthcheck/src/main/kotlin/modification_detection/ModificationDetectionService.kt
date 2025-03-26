@@ -120,8 +120,11 @@ class ModificationDetectionService(
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
-        return updateScriptResponse.updatedScript
+        val json = Json {
+            ignoreUnknownKeys = true
+        }
+        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+        return updateScriptResponse.updatedCode
     }
 
 

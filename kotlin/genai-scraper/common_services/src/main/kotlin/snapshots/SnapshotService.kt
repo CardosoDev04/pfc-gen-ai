@@ -6,6 +6,7 @@ import org.openqa.selenium.TakesScreenshot
 import org.openqa.selenium.WebDriver
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * A service for taking and managing snapshots of web pages.
@@ -23,7 +24,7 @@ class SnapshotService: ISnapshotService {
         val destFile = File("$path/screenshot.png")
         destFile.parentFile.mkdirs()
         val screenshot = (driver as TakesScreenshot).getScreenshotAs(OutputType.FILE)
-        Files.copy(screenshot.toPath(), destFile.toPath())
+        Files.copy(screenshot.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
 
         // Saves the HTML
         val htmlFolderPath = "$path/html"
