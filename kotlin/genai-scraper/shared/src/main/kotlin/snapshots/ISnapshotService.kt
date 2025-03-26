@@ -1,4 +1,4 @@
-package snapshots
+package com.cardoso.snapshots
 
 import org.openqa.selenium.WebDriver
 import java.io.File
