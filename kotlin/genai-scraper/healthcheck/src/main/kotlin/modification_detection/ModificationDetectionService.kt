@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import ollama.ILLMClient
 import ollama.OllamaClient
+import html_fetcher.WebExtractor
 
 /**
  * A service for detecting modifications in HTML and updating scraper scripts.
@@ -35,20 +36,16 @@ class ModificationDetectionService(
      * @return A list of missing elements.
      */
     override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
-        val missingElementsRequest = OllamaGenerateRequest(
-            model = LLM.Mistral7B.modelName,
-            system = GET_MISSING_ELEMENTS_PROMPT,
-            prompt = """
-                BEFORE:
-                $previousHTMLState
-                AFTER:
-                $newHTMLState
-            """.trimIndent(),
-            stream = false,
-            raw = false
-        )
-        val missingElementsResponseJson = llmClient.generate(missingElementsRequest).response
-        return Json.decodeFromString<List<Element>>(missingElementsResponseJson)
+        val webExtractor = WebExtractor()
+
+        val previousElements = webExtractor.getInteractiveElementsHTML(previousHTMLState)
+        val newElements = webExtractor.getInteractiveElementsHTML(newHTMLState)
+
+        return previousElements.filterNot { previousElement ->
+            newElements.any { newElement ->
+                previousElement.cssSelector == newElement.cssSelector
+            }
+        }
     }
 
     /**
@@ -126,6 +123,8 @@ class ModificationDetectionService(
         val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
         return updateScriptResponse.updatedScript
     }
+
+
 }
 
 
@@ -133,14 +132,44 @@ fun main() {
     runBlocking {
         val httpClient = OkHttpClient()
         val llmClient = OllamaClient(httpClient)
-        val service = ModificationDetectionService(llmClient)
-        val modification = Modification("search-button", "search-btn")
-        val oldScript = "driver.get(\"http://localhost:5173/\")\n" +
-                "webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id(\"search-button\"))).click()\n" +
-                "val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id(\"item-title\")))\n" +
-                "val results = optionElements.map { BookingOption(it.text) }"
-        val newScript = service.modifyScript(oldScript, modification)
 
-        print(newScript)
+
+        val oldHTML = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>First HTML</title>
+            </head>
+            <body>
+                <button id="button1">Button 1</button>
+                <button id="button2">Button 2</button>
+                <a href="#" id="link1">Link 1</a>
+                <input type="text" id="input1" />
+                <textarea id="textarea1"></textarea>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val newHTML = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Second HTML</title>
+            </head>
+            <body>
+                <button id="button1">Button 1</button>
+                <a href="#" id="link1">Link 1</a>
+                <input type="text" id="input1" />
+                <textarea id="textarea1"></textarea>
+            </body>
+            </html>
+        """.trimIndent()
+        val missingElements = ModificationDetectionService(llmClient).getMissingElements(oldHTML, newHTML)
+
+        print(missingElements)
     }
 }

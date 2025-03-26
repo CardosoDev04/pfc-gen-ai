@@ -1,4 +1,4 @@
-package snapshots
+package com.cardoso.snapshots
 
 import classes.service_model.Snapshot
 import org.openqa.selenium.WebDriver
