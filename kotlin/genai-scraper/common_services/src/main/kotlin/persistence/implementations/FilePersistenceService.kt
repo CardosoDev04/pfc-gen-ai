@@ -16,7 +16,18 @@ class FilePersistenceService(
 ) : PersistenceService {
 
     /**
-     * Writes the given content to a file.
+     * Writes the given content to a file representing the model.
+     *
+     * @param filePath The path for the result.
+     * @param content The content to write to the file.
+     */
+    override fun write(filePath: String, content: String) {
+        val file = File(filePath)
+        file.writeText(content)
+    }
+
+    /**
+     * Writes the given content to a file representing the model.
      *
      * @param modelName The name of the model.
      * @param fileName The name of the file.

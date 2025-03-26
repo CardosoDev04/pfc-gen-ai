@@ -1,12 +1,20 @@
 package orchestrator
 
 import classes.data.Element
-import classes.service_model.Snapshot
+import classes.llm.Model
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import domain.model.interfaces.IScraper
 import html_fetcher.WebExtractor
 import modification_detection.IModificationDetectionService
+import ollama.ILLMClient
+import org.junit.platform.engine.discovery.DiscoverySelectors
+import org.junit.platform.launcher.LauncherDiscoveryRequest
+import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
+import org.junit.platform.launcher.core.LauncherFactory
+import org.junit.platform.launcher.listeners.SummaryGeneratingListener
+import org.junit.platform.launcher.listeners.TestExecutionSummary
+import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
 import java.net.URLClassLoader
@@ -17,7 +25,9 @@ class Orchestrator(
     private val modificationDetectionService: IModificationDetectionService,
     private val snapshotService: ISnapshotService,
     private val testReportService: ITestReportService,
-    private val webExtractor: WebExtractor
+    private val webExtractor: WebExtractor,
+    private val filePersistenceService: PersistenceService,
+    private val model: Model
 ) : IOrchestrator {
 
     /**
@@ -39,7 +49,9 @@ class Orchestrator(
 
         val newScript = modificationDetectionService.modifyScript(oldScraper.code, modifications)
 
-        val newScraper = compileAndInstantiateNewScraper("TODO()")
+        filePersistenceService.write("kotlin/working/to_test/toTest.kt", newScript)
+
+        val newScraper = compileAndInstantiateNewScraper("kotlin/working/to_test/toTest.kt")
 
         try {
             testScraper(newScraper)
@@ -88,6 +100,19 @@ class Orchestrator(
      * @param scraper The scraper instance to test.
      */
     override suspend fun testScraper(scraper: IScraper) {
-        TODO("Not yet implemented")
+        val summaryGeneratingListener = SummaryGeneratingListener()
+
+        val request: LauncherDiscoveryRequest = LauncherDiscoveryRequestBuilder.request()
+            .selectors(DiscoverySelectors.selectClass(scraper::class.java))
+            .build()
+
+        val launcher = LauncherFactory.create()
+        launcher.registerTestExecutionListeners(summaryGeneratingListener)
+        launcher.execute(request)
+
+        val summary: TestExecutionSummary = summaryGeneratingListener.summary
+        if (summary.totalFailureCount > 0) {
+            throw RuntimeException("Scraper tests failed")
+        }
     }
 }
