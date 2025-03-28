@@ -2,13 +2,12 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.LLM
-import classes.service_model.CssSelectorModification
+import classes.service_model.Locator
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
-import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
 import domain.prompts.GET_MODIFICATION_PROMPT
 import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
@@ -55,16 +54,16 @@ class ModificationDetectionService(
     }
 
     override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
-        val cssSelectorModification = CssSelectorModification(modification.old, modification.new)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(cssSelectorModification), oldScript)
+        val locator = Locator(modification.old, modification.new)
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
     }
 
     override suspend fun modifyScript(oldScript: String, modifications: List<Modification<String>>): String {
-        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old, m.new) }
-        val scraperUpdateRequest = ScraperUpdateRequest(cssSelectorModifications, oldScript)
+        val locators = modifications.map { m -> Locator(m.old, m.new) }
+        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -83,53 +82,28 @@ class ModificationDetectionService(
         val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
         return updateScriptResponse.updatedScript
     }
-
-
 }
 
 
 fun main() {
     runBlocking {
-        val httpClient = OkHttpClient()
+        val httpClient = OkHttpClient.Builder()
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
         val llmClient = OllamaClient(httpClient)
+        val mds = ModificationDetectionService(llmClient)
 
 
-        val oldHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>First HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <button id="button2">Button 2</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
+        val oldScraper = "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n    val driver: WebDriver = ChromeDriver()\n    try {\n        driver.get(\"https://example.com/form\")\n        val nameField = driver.findElement(By.id(\"name\"))\n        nameField.sendKeys(\"John Doe\")\n        val submitButton = driver.findElement(By.id(\"submit-button\"))\n        submitButton.click()\n        driver.manage().timeouts().implicitlyWait(java.time.Duration.ofSeconds(5))\n        println(\"Form submitted successfully\")\n    } finally {\n        driver.quit()\n    }\n}"
 
-        val newHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Second HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
-        val missingElements = ModificationDetectionService(llmClient).getMissingElements(oldHTML, newHTML)
 
-        print(missingElements)
+        val updatedScript = mds.modifyScript(oldScraper, Modification("#submit-button", "#submit-btn"))
+        val updatedScript2 = mds.modifyScript(oldScraper, listOf(Modification("#name", "#name-input"), Modification("#submit-button", "#submit-btn")))
+
+        println(updatedScript)
+        println()
+        println("----------------------------------------------------------------------------------------------------")
+        println()
+        println(updatedScript2)
     }
 }
