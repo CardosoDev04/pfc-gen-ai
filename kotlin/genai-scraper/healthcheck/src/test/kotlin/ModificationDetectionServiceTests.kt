@@ -73,7 +73,7 @@ class ModificationDetectionServiceTests {
             // Then: The missing element is correctly returned
             assertEquals(1, missing.size)
             assertEquals("BUTTON", missing[0].type)
-            assertEquals("#submit-button", missing[0].cssSelector)
+            assertEquals("#submit-button", missing[0].locator)
             assertEquals("Submit", missing[0].text)
         }
 
@@ -143,7 +143,7 @@ class ModificationDetectionServiceTests {
         // Then: The missing elements are correctly returned
         assertEquals(1, missing.size)
         assertEquals("INPUT", missing[0].type)
-        assertEquals("#email", missing[0].cssSelector)
+        assertEquals("#email", missing[0].locator)
         assertEquals("", missing[0].text)
     }
 
@@ -213,7 +213,7 @@ class ModificationDetectionServiceTests {
         // Then: The missing element is correctly returned
         assertEquals(1, missing.size)
         assertEquals("TEXTAREA", missing[0].type)
-        assertEquals("#message", missing[0].cssSelector)
+        assertEquals("#message", missing[0].locator)
         assertEquals("", missing[0].text)
     }
 
@@ -289,8 +289,8 @@ class ModificationDetectionServiceTests {
         assertEquals(3, missing.size)
         assertEquals(2, missing.filter { elem -> elem.type == "BUTTON" }.size)
         assertTrue(missing.any { elem -> elem.type == "DIV" })
-        assertTrue(missing.any { elem -> elem.cssSelector == "signup-button" })
-        assertTrue(missing.any { elem -> elem.cssSelector == "search-button" })
+        assertTrue(missing.any { elem -> elem.locator == "signup-button" })
+        assertTrue(missing.any { elem -> elem.locator == "search-button" })
         assertTrue(missing.any { elem -> elem.text == "Sign Up" })
         assertTrue(missing.any { elem -> elem.text == "Search" })
     }

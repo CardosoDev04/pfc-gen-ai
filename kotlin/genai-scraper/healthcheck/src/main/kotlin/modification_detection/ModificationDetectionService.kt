@@ -2,13 +2,12 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.LLM
-import classes.service_model.CssSelectorModification
+import classes.service_model.Locator
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
-import domain.prompts.GET_MISSING_ELEMENTS_PROMPT
 import domain.prompts.GET_MODIFICATION_PROMPT
 import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
@@ -43,7 +42,7 @@ class ModificationDetectionService(
 
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
-                previousElement.cssSelector == newElement.cssSelector
+                previousElement.locator == newElement.locator
             }
         }
     }
@@ -81,9 +80,9 @@ class ModificationDetectionService(
      * @param modification The modification to apply.
      * @return The modified script.
      */
-    override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
-        val cssSelectorModification = CssSelectorModification(modification.old, modification.new)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(cssSelectorModification), oldScript)
+    override suspend fun modifyScript(oldScript: String, modification: Modification<Element>): String {
+        val locator = Locator(modification.old.locator, modification.new.locator)
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -97,8 +96,8 @@ class ModificationDetectionService(
      * @return The modified script.
      */
     override suspend fun modifyScript(oldScript: String, modifications: List<Modification<Element>>): String {
-        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old.cssSelector, m.new.cssSelector) }
-        val scraperUpdateRequest = ScraperUpdateRequest(cssSelectorModifications, oldScript)
+        val locators = modifications.map { m -> Locator(m.old.locator, m.new.locator) }
+        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -120,59 +119,29 @@ class ModificationDetectionService(
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        val json = Json {
-            ignoreUnknownKeys = true
-        }
-        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
         return updateScriptResponse.updatedCode
     }
-
-
 }
 
 
 fun main() {
     runBlocking {
-        val httpClient = OkHttpClient()
+        val httpClient = OkHttpClient.Builder()
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
         val llmClient = OllamaClient(httpClient)
+        val mds = ModificationDetectionService(llmClient)
 
+        val oldScraper = "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n    val driver: WebDriver = ChromeDriver()\n    try {\n        driver.get(\"https://example.com/form\")\n        val nameField = driver.findElement(By.id(\"name\"))\n        nameField.sendKeys(\"John Doe\")\n        val submitButton = driver.findElement(By.id(\"submit-button\"))\n        submitButton.click()\n        driver.manage().timeouts().implicitlyWait(java.time.Duration.ofSeconds(5))\n        println(\"Form submitted successfully\")\n    } finally {\n        driver.quit()\n    }\n}"
 
-        val oldHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>First HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <button id="button2">Button 2</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
+        val updatedScript = mds.modifyScript(oldScraper, Modification(Element("BUTTON", "#submit-button"), Element("BUTTON", "#submit-btn")))
+        val updatedScript2 = mds.modifyScript(oldScraper, listOf(Modification(Element("BUTTON","#name"), Element("BUTTON", "#name-input")), Modification(Element("BUTTON", "#submit-button"), Element("BUTTON", "#submit-btn"))))
 
-        val newHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Second HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
-        val missingElements = ModificationDetectionService(llmClient).getMissingElements(oldHTML, newHTML)
-
-        print(missingElements)
+        println(updatedScript)
+        println()
+        println("----------------------------------------------------------------------------------------------------")
+        println()
+        println(updatedScript2)
     }
 }

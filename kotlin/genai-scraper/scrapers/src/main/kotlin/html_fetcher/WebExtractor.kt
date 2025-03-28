@@ -3,11 +3,9 @@ package html_fetcher
 import classes.data.Element
 import com.cardoso.common.buildChromeDriver
 import org.jsoup.Jsoup
-import org.openqa.selenium.By
 import org.openqa.selenium.JavascriptExecutor
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.WebElement
-import java.time.Duration
 
 
 class WebExtractor {
@@ -50,7 +48,7 @@ class WebExtractor {
         return document.select(selectors.joinToString(", ")).map { element ->
             Element(
                 type = element.tagName(),
-                cssSelector = element.cssSelector(),
+                locator = element.cssSelector(),
                 text = element.ownText().trim()
             )
         }
@@ -62,7 +60,7 @@ fun main() {
     val elements = webExtractor.getInteractiveElementsHTML("")
 
     elements.forEach { element ->
-        println("Type: ${element.type}, CSS Selector: ${element.cssSelector}, Text: ${element.text}")
+        println("Type: ${element.type}, CSS Selector: ${element.locator}, Text: ${element.text}")
     }
 
 }
