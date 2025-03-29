@@ -82,7 +82,9 @@ class ModificationDetectionService(
      */
     override suspend fun modifyScript(oldScript: String, modification: Modification<Element>): String {
         val locator = Locator(modification.old.locator, modification.new.locator)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript)
+        val importsRegex = Regex(".*?(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -97,7 +99,9 @@ class ModificationDetectionService(
      */
     override suspend fun modifyScript(oldScript: String, modifications: List<Modification<Element>>): String {
         val locators = modifications.map { m -> Locator(m.old.locator, m.new.locator) }
-        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript)
+        val importsRegex = Regex("(?s)(.*?)(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -119,29 +123,27 @@ class ModificationDetectionService(
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+        val cleanedScriptResponseJson = updateScriptResponseJson.cleanUpdateScriptResponseJson()
+        val json = Json {
+            ignoreUnknownKeys = true
+        }
+        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(cleanedScriptResponseJson)
         return updateScriptResponse.updatedCode
     }
-}
 
+    private fun String.cleanUpdateScriptResponseJson(): String {
+        // Ensure we keep the 'package' statement and everything after it
+        val cleanedScript = this.substringAfter("\npackage ", missingDelimiterValue = this)
 
-fun main() {
-    runBlocking {
-        val httpClient = OkHttpClient.Builder()
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val llmClient = OllamaClient(httpClient)
-        val mds = ModificationDetectionService(llmClient)
+        // Restore 'package' keyword if it was the first line
+        val restoredScript = if (this.startsWith("package ")) "package $cleanedScript" else cleanedScript
 
-        val oldScraper = "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n    val driver: WebDriver = ChromeDriver()\n    try {\n        driver.get(\"https://example.com/form\")\n        val nameField = driver.findElement(By.id(\"name\"))\n        nameField.sendKeys(\"John Doe\")\n        val submitButton = driver.findElement(By.id(\"submit-button\"))\n        submitButton.click()\n        driver.manage().timeouts().implicitlyWait(java.time.Duration.ofSeconds(5))\n        println(\"Form submitted successfully\")\n    } finally {\n        driver.quit()\n    }\n}"
-
-        val updatedScript = mds.modifyScript(oldScraper, Modification(Element("BUTTON", "#submit-button"), Element("BUTTON", "#submit-btn")))
-        val updatedScript2 = mds.modifyScript(oldScraper, listOf(Modification(Element("BUTTON","#name"), Element("BUTTON", "#name-input")), Modification(Element("BUTTON", "#submit-button"), Element("BUTTON", "#submit-btn"))))
-
-        println(updatedScript)
-        println()
-        println("----------------------------------------------------------------------------------------------------")
-        println()
-        println(updatedScript2)
+        // Remove formatting artifacts
+        return restoredScript
+            .replace(Regex("^```\\w*\\s*"), "") // Remove leading ```json, ```kotlin, ```scala, etc.
+            .replace(Regex("```"), "") // Remove trailing ```
+            .replace(Regex("^'''\\w*\\s*"), "") // Remove leading '''json, '''kotlin, etc.
+            .replace(Regex("'''"), "") // Remove trailing '''
+            .trim() // Trim unnecessary whitespace
     }
 }
