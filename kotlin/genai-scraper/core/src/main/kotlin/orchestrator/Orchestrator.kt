@@ -123,12 +123,12 @@ class Orchestrator(
      *
      * @param scraper The scraper instance to run.
      */
-    override suspend fun runDemoScraper(scraper: DemoScraperDataBundle) {
+    override suspend fun runScraper(scraper: IScraperData, snapshotsPath: String) {
         try {
             scraper.compiledClass.scrape()
         } catch (e: Exception) {
 
-            val lastCreated = findLastCreatedDirectory("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest")
+            val lastCreated = findLastCreatedDirectory(snapshotsPath)
                 ?: throw IllegalStateException("Could not find step directory.")
             val stepName = lastCreated.name
 
@@ -206,6 +206,6 @@ fun main() {
     val demoScraperBundle = DemoScraperDataBundle(fps.read("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/demo/DemoScraper.kt"), demoScraper)
 
     runBlocking {
-        orchestrator.runDemoScraper(demoScraperBundle)
+        orchestrator.runScraper(demoScraperBundle, "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest")
     }
 }
