@@ -7,7 +7,6 @@ const val SCRAPER_UPDATE_PROMPT = """
     ## INPUT FORMAT
     You will receive a JSON object with the following structure:
 
-    ```json
     {
       "imports": "string (original import statements)",
       "script": "string (complete original Selenium script)",
@@ -18,7 +17,6 @@ const val SCRAPER_UPDATE_PROMPT = """
         }
       ]
     }
-    ```
 
     ## TASK INSTRUCTIONS
     1. **DO NOT modify imports.** Keep them **exactly as received**, preserving order and spacing.
@@ -27,15 +25,14 @@ const val SCRAPER_UPDATE_PROMPT = """
     4. **If waiting conditions or interaction methods need adjustments** due to locator type changes, update them accordingly.
     5. **Preserve all functionality and logic** from the original script as much as possible.
     6. **Return the full, updated script** as a structured JSON response.
+    7. In your response, **always** include the original explicit return types for methods. For example if the input has methodA(): String the output should include methodA(): String
 
     ## OUTPUT FORMAT
     Respond **only** with a JSON object in the following format:
 
-    ```json
     {
       "updatedCode": "string (complete updated script with replacements made)"
     }
-    ```
 
     ## STRICT RULES
     - **DO NOT remove, reorder, or modify the import statements.**
@@ -46,7 +43,6 @@ const val SCRAPER_UPDATE_PROMPT = """
     -**IT IS MANDATORY THAT YOU RESPOND WITH A JSON OBJECT IN THE REQUESTED FORMAT**
     
     ## EXAMPLE INPUT
-    ```json
     {
       "imports": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver",
       "script": "fun main() {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"old-id\"))\n  button.click()\n  driver.quit()\n}",
@@ -57,12 +53,27 @@ const val SCRAPER_UPDATE_PROMPT = """
         }
       ]
     }
-    ```
 
     ## EXAMPLE OUTPUT
-    ```json
     {
       "updatedCode": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"new-id\"))\n  button.click()\n  driver.quit()\n}"
     }
-    ```
+    
+    ## EXAMPLE INPUT
+    {
+      "imports": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver",
+      "script": "fun scraper(): String {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"old-id\"))\n  button.click()\n  driver.quit()\n return "Completed scraping"\n}",
+      "locator_changes": [
+        {
+          "oldLocator": "old-id",
+          "newLocator": "new-id"
+        }
+      ]
+    }
+    
+    ## EXAMPLE OUTPUT
+    {
+      "updatedCode": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun scraper(): String {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"new-id\"))\n  button.click()\n  driver.quit()\n return "Completed scraping"\n}"
+    }
+    
 """

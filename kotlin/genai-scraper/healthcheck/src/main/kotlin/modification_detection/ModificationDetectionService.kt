@@ -144,6 +144,10 @@ class ModificationDetectionService(
             .replace(Regex("```"), "") // Remove trailing ```
             .replace(Regex("^'''\\w*\\s*"), "") // Remove leading '''json, '''kotlin, etc.
             .replace(Regex("'''"), "") // Remove trailing '''
+            .replace("json", "")
+            .replace("json", "")
+            .replace("kotlin", "")
+            .replace("scala", "")
             .trim() // Trim unnecessary whitespace
     }
 }
