@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ScraperUpdateRequest(
     val locatorChanges: List<Locator>,
-    val script: String
+    val script: String,
+    val imports: String
 )

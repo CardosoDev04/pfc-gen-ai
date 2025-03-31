@@ -11,7 +11,8 @@ repositories {
 
 dependencies {
     implementation(project(":domain"))
-    implementation(project(":shared"))
+    implementation(project(":common_services"))
+    implementation("org.jsoup:jsoup:1.15.4")
     implementation("org.seleniumhq.selenium:selenium-java:4.29.0")
     implementation("org.seleniumhq.selenium:selenium-chrome-driver:4.29.0")
     implementation ("io.github.cdimascio:dotenv-kotlin:6.2.2")

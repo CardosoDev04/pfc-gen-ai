@@ -21,7 +21,7 @@ function App() {
                     type="text"
                 />
                 <button
-                    id="search-button"
+                    id="search-btn"
                     onClick={() => {
                         setIsListShown((prev) => !prev);
                     }}

@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ScraperUpdateResponse(
-    val updatedScript: String
+    val updatedCode: String
 )

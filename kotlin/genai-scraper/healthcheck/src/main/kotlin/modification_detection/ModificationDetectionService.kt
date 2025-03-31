@@ -18,9 +18,22 @@ import ollama.ILLMClient
 import ollama.OllamaClient
 import html_fetcher.WebExtractor
 
+/**
+ * A service for detecting modifications in HTML and updating scraper scripts.
+ *
+ * @property llmClient The client for interacting with the LLM.
+ */
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
 ) : IModificationDetectionService {
+
+    /**
+     * Gets the missing elements between the previous and new HTML states.
+     *
+     * @param previousHTMLState The previous HTML state.
+     * @param newHTMLState The new HTML state.
+     * @return A list of missing elements.
+     */
     override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
         val webExtractor = WebExtractor()
 
@@ -29,11 +42,18 @@ class ModificationDetectionService(
 
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
-                previousElement.cssSelector == newElement.cssSelector
+                previousElement.locator == newElement.locator
             }
         }
     }
 
+    /**
+     * Gets the modification for a modified element.
+     *
+     * @param modifiedElement The modified element.
+     * @param newElements The new elements.
+     * @return The modification for the element.
+     */
     override suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification<Element> {
         val modifiedElementJson = Json.encodeToString(Element.serializer(), modifiedElement)
         val newElementsJson = Json.encodeToString(ListSerializer(Element.serializer()), newElements)
@@ -53,22 +73,46 @@ class ModificationDetectionService(
         return Modification(modifiedElement, alternativeElement)
     }
 
-    override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
-        val locator = Locator(modification.old, modification.new)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript)
+    /**
+     * Modifies the script based on a single modification.
+     *
+     * @param oldScript The old script.
+     * @param modification The modification to apply.
+     * @return The modified script.
+     */
+    override suspend fun modifyScript(oldScript: String, modification: Modification<Element>): String {
+        val locator = Locator(modification.old.locator, modification.new.locator)
+        val importsRegex = Regex(".*?(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
     }
 
-    override suspend fun modifyScript(oldScript: String, modifications: List<Modification<String>>): String {
-        val locators = modifications.map { m -> Locator(m.old, m.new) }
-        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript)
+    /**
+     * Modifies the script based on a list of modifications.
+     *
+     * @param oldScript The old script.
+     * @param modifications The list of modifications to apply.
+     * @return The modified script.
+     */
+    override suspend fun modifyScript(oldScript: String, modifications: List<Modification<Element>>): String {
+        val locators = modifications.map { m -> Locator(m.old.locator, m.new.locator) }
+        val importsRegex = Regex("(?s)(.*?)(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
     }
 
+    /**
+     * Queries the LLM with the update request JSON.
+     *
+     * @param updateRequestJson The update request JSON.
+     * @return The updated script.
+     */
     private suspend fun queryLLM(updateRequestJson: String): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = LLM.Mistral7B.modelName,
@@ -79,31 +123,31 @@ class ModificationDetectionService(
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
-        return updateScriptResponse.updatedScript
+        val cleanedScriptResponseJson = updateScriptResponseJson.cleanUpdateScriptResponseJson()
+        val json = Json {
+            ignoreUnknownKeys = true
+        }
+        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(cleanedScriptResponseJson)
+        return updateScriptResponse.updatedCode
     }
-}
 
+    private fun String.cleanUpdateScriptResponseJson(): String {
+        // Ensure we keep the 'package' statement and everything after it
+        val cleanedScript = this.substringAfter("\npackage ", missingDelimiterValue = this)
 
-fun main() {
-    runBlocking {
-        val httpClient = OkHttpClient.Builder()
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val llmClient = OllamaClient(httpClient)
-        val mds = ModificationDetectionService(llmClient)
+        // Restore 'package' keyword if it was the first line
+        val restoredScript = if (this.startsWith("package ")) "package $cleanedScript" else cleanedScript
 
-
-        val oldScraper = "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n    val driver: WebDriver = ChromeDriver()\n    try {\n        driver.get(\"https://example.com/form\")\n        val nameField = driver.findElement(By.id(\"name\"))\n        nameField.sendKeys(\"John Doe\")\n        val submitButton = driver.findElement(By.id(\"submit-button\"))\n        submitButton.click()\n        driver.manage().timeouts().implicitlyWait(java.time.Duration.ofSeconds(5))\n        println(\"Form submitted successfully\")\n    } finally {\n        driver.quit()\n    }\n}"
-
-
-        val updatedScript = mds.modifyScript(oldScraper, Modification("#submit-button", "#submit-btn"))
-        val updatedScript2 = mds.modifyScript(oldScraper, listOf(Modification("#name", "#name-input"), Modification("#submit-button", "#submit-btn")))
-
-        println(updatedScript)
-        println()
-        println("----------------------------------------------------------------------------------------------------")
-        println()
-        println(updatedScript2)
+        // Remove formatting artifacts
+        return restoredScript
+            .replace(Regex("^```\\w*\\s*"), "") // Remove leading ```json, ```kotlin, ```scala, etc.
+            .replace(Regex("```"), "") // Remove trailing ```
+            .replace(Regex("^'''\\w*\\s*"), "") // Remove leading '''json, '''kotlin, etc.
+            .replace(Regex("'''"), "") // Remove trailing '''
+            .replace("json", "")
+            .replace("json", "")
+            .replace("kotlin", "")
+            .replace("scala", "")
+            .trim() // Trim unnecessary whitespace
     }
 }
