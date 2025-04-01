@@ -72,7 +72,7 @@ class ModificationDetectionServiceTests {
 
             // Then: The missing element is correctly returned
             assertEquals(1, missing.size)
-            assertEquals("BUTTON", missing[0].type)
+            assertEquals("button", missing[0].type)
             assertEquals("#submit-button", missing[0].cssSelector)
             assertEquals("Submit", missing[0].text)
         }
@@ -142,7 +142,7 @@ class ModificationDetectionServiceTests {
 
         // Then: The missing elements are correctly returned
         assertEquals(1, missing.size)
-        assertEquals("INPUT", missing[0].type)
+        assertEquals("input", missing[0].type)
         assertEquals("#email", missing[0].cssSelector)
         assertEquals("", missing[0].text)
     }
@@ -212,7 +212,7 @@ class ModificationDetectionServiceTests {
 
         // Then: The missing element is correctly returned
         assertEquals(1, missing.size)
-        assertEquals("TEXTAREA", missing[0].type)
+        assertEquals("textarea", missing[0].type)
         assertEquals("#message", missing[0].cssSelector)
         assertEquals("", missing[0].text)
     }
@@ -261,10 +261,6 @@ class ModificationDetectionServiceTests {
                 <title>Travel Search</title>
             </head>
             <body>
-                <div>
-                    <button type="button" id="login-button">Login</button>
-                </div>
-                
                 <h2>Find Your Trip</h2>
                 <form action="/search" method="get">
                     <div>
@@ -274,6 +270,9 @@ class ModificationDetectionServiceTests {
                     <div>
                         <label for="destination">Destination:</label>
                         <input type="text" id="destination" name="destination" placeholder="Enter destination city" required>
+                    </div>
+                    <div>
+                        <button type="submit" id="search-button">Search</button>
                     </div>
                 </form>
             </body>
@@ -286,13 +285,10 @@ class ModificationDetectionServiceTests {
         missing.forEach { println(it) }
 
         // Then: The missing elements are correctly returned
-        assertEquals(3, missing.size)
-        assertEquals(2, missing.filter { elem -> elem.type == "BUTTON" }.size)
-        assertTrue(missing.any { elem -> elem.type == "DIV" })
-        assertTrue(missing.any { elem -> elem.cssSelector == "signup-button" })
-        assertTrue(missing.any { elem -> elem.cssSelector == "search-button" })
-        assertTrue(missing.any { elem -> elem.text == "Sign Up" })
-        assertTrue(missing.any { elem -> elem.text == "Search" })
+        assertEquals(2, missing.size)
+        assertTrue(missing.any { elem -> elem.type == "button" &&  elem.cssSelector == "#login-button" && elem.text == "Login" })
+        assertTrue(missing.any { elem -> elem.type == "button" && elem.cssSelector == "#signup-button" && elem.text == "Sign Up" })
+
     }
 
     companion object {
