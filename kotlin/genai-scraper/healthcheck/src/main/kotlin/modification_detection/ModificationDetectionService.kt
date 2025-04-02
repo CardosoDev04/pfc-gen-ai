@@ -130,7 +130,6 @@ class ModificationDetectionService(
 
 }
 
-
 fun main() {
     runBlocking {
         val httpClient = OkHttpClient()
