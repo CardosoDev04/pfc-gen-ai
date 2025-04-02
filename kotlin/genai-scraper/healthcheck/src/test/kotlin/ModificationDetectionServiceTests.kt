@@ -30,7 +30,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -59,7 +59,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                 </form>
@@ -100,7 +100,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -128,7 +128,7 @@ class ModificationDetectionServiceTests {
                         <label for="email">Email:</label>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -170,7 +170,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -199,7 +199,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
                 </form>

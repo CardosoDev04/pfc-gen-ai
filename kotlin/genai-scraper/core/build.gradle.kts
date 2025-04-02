@@ -30,6 +30,7 @@ dependencies {
     testImplementation("org.junit.platform:junit-platform-launcher:1.9.3")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+    testImplementation(kotlin("test"))
 }
 
 tasks.test {

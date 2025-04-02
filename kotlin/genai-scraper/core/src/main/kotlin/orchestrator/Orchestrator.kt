@@ -1,5 +1,6 @@
 package orchestrator
 
+import classes.llm.LLM
 import classes.llm.Model
 import classes.scrapers.DemoScraperDataBundle
 import com.cardoso.common.buildChromeDriver
@@ -8,6 +9,9 @@ import core.TestReportService
 import demo.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
+import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
+import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
+import domain.prompts.MISTRAL_SCRAPER_UPDATE_PROMPT
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -72,7 +76,11 @@ class Orchestrator(
         val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
         val modifications = modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
 
-        val newScript = modificationDetectionService.modifyScript(oldScraper.code, modifications)
+        val newScript = when(modelName) {
+            LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
+            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeLlamalScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            else -> throw Exception("Unrecognized model name.")
+        }
 
         filePersistenceService.write("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/demo/DemoScraper.kt", newScript)
 
@@ -171,6 +179,11 @@ class Orchestrator(
         if (summary.totalFailureCount > 0) {
             throw RuntimeException("Scraper tests failed")
         }
+    }
+
+    companion object {
+        val modelName = LLM.Mistral7B.modelName
+        var prompt = MISTRAL_SCRAPER_UPDATE_PROMPT
     }
 }
 
