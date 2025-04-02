@@ -86,7 +86,7 @@ class ModificationDetectionService(
         return queryLLMJson(scraperUpdateRequestJson, modelName, prompt)
     }
 
-    override suspend fun modifyCodeLlamalScript(
+    override suspend fun modifyCodeGenerationLLMScript(
         oldScript: String,
         modifications: List<Modification<Element>>,
         modelName: String,

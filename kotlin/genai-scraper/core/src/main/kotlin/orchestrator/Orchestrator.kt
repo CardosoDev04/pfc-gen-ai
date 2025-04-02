@@ -11,7 +11,6 @@ import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
 import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
-import domain.prompts.MISTRAL_SCRAPER_UPDATE_PROMPT
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -78,7 +77,8 @@ class Orchestrator(
 
         val newScript = when(modelName) {
             LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
-            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeLlamalScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
             else -> throw Exception("Unrecognized model name.")
         }
 
@@ -182,8 +182,8 @@ class Orchestrator(
     }
 
     companion object {
-        val modelName = LLM.Mistral7B.modelName
-        var prompt = MISTRAL_SCRAPER_UPDATE_PROMPT
+        val modelName = LLM.DeepSeekCoder1Point3B.modelName
+        var prompt = CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
     }
 }
 
