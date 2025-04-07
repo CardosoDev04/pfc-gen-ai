@@ -1,5 +1,4 @@
-
-#### What is it?
+## What is it?
 
 Fine-tuning a large language model(LLM) consistes in the process of adapting an existing model to perform a specific task with greater precision an efficiency.
 
@@ -9,18 +8,18 @@ Today, most LLMs have an acceptable general-purpose performance but they often s
 
 Essentially, fine-tuning tailors an existing LLM to increase its performance for solving specific tasks.
 
-#### Types of Fine-tuning
+## Types of Fine-tuning
 
 Fine-tuning can be achieved through multiple pathways, each suited to particular objectives and resources. Below we list some of the most common approaches:
 
-##### Supervised Fine-tuning
+### Supervised Fine-tuning
 
 This approach trains a model on a labeled dataset tailored to the target task to perform, such as text classification on named entity recognition.
 
 Example:
 Providing a dataset of phrases labeled with sentiment(positive, negative or neutral) to train a model that can classify the emotional tone of a text.
 
-##### Few-shot Learning
+### Few-shot Learning
 
 In this case, you write well-crafted prompts that include examples, from which the model will infer the desired behaviour. This allows the model to have better context of the task without an extensive fine-tuning process.
 
@@ -38,7 +37,7 @@ A:
 ```
 
 To which the LLM will learn the pattern and answer Lisbon.
-##### Transfer Learning
+### Transfer Learning
 
 This technique involves taking a model that was trained for one task and fine-tuning it to a different, yet related, task. It leverages the model's existing language understanding to adapt it mode efficiently to new challenges.
 
@@ -52,14 +51,14 @@ Example:
 - The Goal:  
   The goal is a model better equipped at answering medical questions — like a doctor-style assistant that can understand and answer questions about diseases, drugs, symptoms, etc.
 
-##### Domain-specific fine-tuning
+### Domain-specific fine-tuning
 
 This method adapts the model to understand and generate text that is specific to a particular domain or industry by being fine-tuned on a dataset composed of text from the target domain in order to improve its context and knowledge of domain-specific tasks.
 
 Example:
 To generate a chatbot for a medical application, the model could be trained with medical records, clinical notes or medical literature to adapt its language understanding capabilities to the healthcare field.
 
-##### Instruction Tuning
+### Instruction Tuning
 
 Instruction tuning involves training a model on datasets structures as triples: instruction, input and output. This helps the model understand and complete tasks via instructions.
 
@@ -73,7 +72,7 @@ Example:
 }
 ```
 
-#### Conclusion
+## Conclusion
 
 There are multiple approaches to fine-tuning a large language model (LLM), each tailored to different goals, resources, and use cases. The diversity of methods makes it essential to understand their characteristics before choosing one.
 

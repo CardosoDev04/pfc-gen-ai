@@ -39,7 +39,7 @@ Some key strategies to avoid LLM hallucination are:
 
 - Advanced Prompting Techniques like **Few Shot Prompting** or **Chain of Thought Prompting**
 - Retrieval Augmented Generation ([[RAG]])
-- Fine-tuning LLMs
+- [[Fine-Tuning]] LLMs 
 
 ## References
 
