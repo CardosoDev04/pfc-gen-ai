@@ -1,10 +1,11 @@
 package domain.modification.requests
 
-import classes.service_model.CssSelectorModification
+import classes.service_model.Locator
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class ScraperUpdateRequest(
-    val selectorChanges: List<CssSelectorModification>,
-    val script: String
+    val locatorChanges: List<Locator>,
+    val script: String,
+    val imports: String
 )

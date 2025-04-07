@@ -2,7 +2,7 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.LLM
-import classes.service_model.CssSelectorModification
+import classes.service_model.Locator
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
@@ -42,7 +42,7 @@ class ModificationDetectionService(
 
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
-                previousElement.cssSelector == newElement.cssSelector
+                previousElement.locator == newElement.locator
             }
         }
     }
@@ -80,9 +80,11 @@ class ModificationDetectionService(
      * @param modification The modification to apply.
      * @return The modified script.
      */
-    override suspend fun modifyScript(oldScript: String, modification: Modification<String>): String {
-        val cssSelectorModification = CssSelectorModification(modification.old, modification.new)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(cssSelectorModification), oldScript)
+    override suspend fun modifyScript(oldScript: String, modification: Modification<Element>): String {
+        val locator = Locator(modification.old.locator, modification.new.locator)
+        val importsRegex = Regex(".*?(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -96,8 +98,10 @@ class ModificationDetectionService(
      * @return The modified script.
      */
     override suspend fun modifyScript(oldScript: String, modifications: List<Modification<Element>>): String {
-        val cssSelectorModifications = modifications.map { m -> CssSelectorModification(m.old.cssSelector, m.new.cssSelector) }
-        val scraperUpdateRequest = ScraperUpdateRequest(cssSelectorModifications, oldScript)
+        val locators = modifications.map { m -> Locator(m.old.locator, m.new.locator) }
+        val importsRegex = Regex("(?s)(.*?)(?=\\bclass\\b)")
+        val imports = importsRegex.find(oldScript)?.value ?: ""
+        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
         return queryLLM(scraperUpdateRequestJson)
@@ -119,58 +123,31 @@ class ModificationDetectionService(
         )
 
         val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
+        val cleanedScriptResponseJson = updateScriptResponseJson.cleanUpdateScriptResponseJson()
         val json = Json {
             ignoreUnknownKeys = true
         }
-        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(cleanedScriptResponseJson)
         return updateScriptResponse.updatedCode
     }
 
+    private fun String.cleanUpdateScriptResponseJson(): String {
+        // Ensure we keep the 'package' statement and everything after it
+        val cleanedScript = this.substringAfter("\npackage ", missingDelimiterValue = this)
 
-}
+        // Restore 'package' keyword if it was the first line
+        val restoredScript = if (this.startsWith("package ")) "package $cleanedScript" else cleanedScript
 
-fun main() {
-    runBlocking {
-        val httpClient = OkHttpClient()
-        val llmClient = OllamaClient(httpClient)
-
-
-        val oldHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>First HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <button id="button2">Button 2</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
-
-        val newHTML = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Second HTML</title>
-            </head>
-            <body>
-                <button id="button1">Button 1</button>
-                <a href="#" id="link1">Link 1</a>
-                <input type="text" id="input1" />
-                <textarea id="textarea1"></textarea>
-            </body>
-            </html>
-        """.trimIndent()
-        val missingElements = ModificationDetectionService(llmClient).getMissingElements(oldHTML, newHTML)
-
-        print(missingElements)
+        // Remove formatting artifacts
+        return restoredScript
+            .replace(Regex("^```\\w*\\s*"), "") // Remove leading ```json, ```kotlin, ```scala, etc.
+            .replace(Regex("```"), "") // Remove trailing ```
+            .replace(Regex("^'''\\w*\\s*"), "") // Remove leading '''json, '''kotlin, etc.
+            .replace(Regex("'''"), "") // Remove trailing '''
+            .replace("json", "")
+            .replace("json", "")
+            .replace("kotlin", "")
+            .replace("scala", "")
+            .trim() // Trim unnecessary whitespace
     }
 }
