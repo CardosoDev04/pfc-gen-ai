@@ -21,7 +21,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(
                 driver,
-                "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest/step1"
+                Configurations.snapshotBaseDir + "demo_website/get_options/latest/step1"
             )
 
             webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
@@ -32,7 +32,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(
                 driver,
-                "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest/step2"
+                Configurations.snapshotBaseDir + "demo_website/scrape/latest/step2"
             )
 
 

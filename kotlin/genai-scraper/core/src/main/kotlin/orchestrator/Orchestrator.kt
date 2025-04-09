@@ -62,8 +62,8 @@ class Orchestrator(
      * @param retries The number of retries allowed if the scraper fails tests.
      */
     override suspend fun correctScraper(oldScraper: IScraperData, stepName: String, retries: Int) {
-        val latestSnapshot = snapshotService.getSnapshot("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest/$stepName/html/source.html")
-        val latestStableSnapshot = snapshotService.getSnapshot("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest_stable/$stepName/html/source.html")
+        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "demo_website/scrape/latest/$stepName/html/source.html")
+        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "demo_website/scrape/latest_stable/$stepName/html/source.html")
         val latestSnapshotHtml = latestSnapshot.html.readText()
         val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
 
@@ -74,9 +74,9 @@ class Orchestrator(
 
         val newScript = modificationDetectionService.modifyScript(oldScraper.code, modifications)
 
-        filePersistenceService.write("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/demo/DemoScraper.kt", newScript)
+        filePersistenceService.write(Configurations.scrapersBaseDir + "demo/DemoScraper.kt", newScript)
 
-        val newScraper = compileAndInstantiateNewScraper("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/demo/DemoScraper.kt")
+        val newScraper = compileAndInstantiateNewScraper(Configurations.scrapersBaseDir + "demo/DemoScraper.kt")
 
         try {
             testScraper(newScraper)
@@ -203,9 +203,9 @@ fun main() {
     )
 
     val demoScraper = DemoScraper(driver, snapshotServ)
-    val demoScraperBundle = DemoScraperDataBundle(fps.read("/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/demo/DemoScraper.kt"), demoScraper)
+    val demoScraperBundle = DemoScraperDataBundle(fps.read(Configurations.scrapersBaseDir + "demo/DemoScraper.kt"), demoScraper)
 
     runBlocking {
-        orchestrator.runScraper(demoScraperBundle, "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest")
+        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "demo_website/get_options/latest")
     }
 }
