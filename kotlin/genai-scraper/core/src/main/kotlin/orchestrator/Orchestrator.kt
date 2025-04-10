@@ -5,7 +5,7 @@ import classes.scrapers.DemoScraperDataBundle
 import com.cardoso.common.buildChromeDriver
 import core.ExecutionTracker
 import core.TestReportService
-import demo.DemoScraper
+import scrapers.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import interfaces.IScraperData
@@ -37,6 +37,7 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 fun findLastCreatedDirectory(directoryPath: String): File? {
+    println(directoryPath)
     val directory = File(directoryPath)
     if (!directory.exists() || !directory.isDirectory) {
         throw IllegalArgumentException("The provided path is not a valid directory")
@@ -62,21 +63,20 @@ class Orchestrator(
      * @param retries The number of retries allowed if the scraper fails tests.
      */
     override suspend fun correctScraper(oldScraper: IScraperData, stepName: String, retries: Int) {
-        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "demo_website/scrape/latest/$stepName/html/source.html")
-        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "demo_website/scrape/latest_stable/$stepName/html/source.html")
+        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
+        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
         val latestSnapshotHtml = latestSnapshot.html.readText()
         val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
 
-        val modifiedElements =
-            modificationDetectionService.getMissingElements(latestStableSnapshotHtml, latestSnapshotHtml)
+        val modifiedElements = modificationDetectionService.getMissingElements(latestStableSnapshotHtml, latestSnapshotHtml)
         val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
         val modifications = modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
 
         val newScript = modificationDetectionService.modifyScript(oldScraper.code, modifications)
 
-        filePersistenceService.write(Configurations.scrapersBaseDir + "demo/DemoScraper.kt", newScript)
+        filePersistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
-        val newScraper = compileAndInstantiateNewScraper(Configurations.scrapersBaseDir + "demo/DemoScraper.kt")
+        val newScraper = compileAndInstantiateNewScraper(Configurations.scrapersBaseDir + "${oldScraper.name}.kt")
 
         try {
             testScraper(newScraper)
@@ -113,7 +113,7 @@ class Orchestrator(
 
         val newClassLoader = URLClassLoader.newInstance(arrayOf(outputDir.toURI().toURL()), this::class.java.classLoader)
         val className = file.nameWithoutExtension.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-        val clazz = newClassLoader.loadClass("demo.$className")
+        val clazz = newClassLoader.loadClass("scrapers.$className")
 
         return clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java).newInstance(driver, snapshotService) as IScraper
     }
@@ -203,9 +203,9 @@ fun main() {
     )
 
     val demoScraper = DemoScraper(driver, snapshotServ)
-    val demoScraperBundle = DemoScraperDataBundle(fps.read(Configurations.scrapersBaseDir + "demo/DemoScraper.kt"), demoScraper)
+    val demoScraperBundle = DemoScraperDataBundle(Configurations.scrapersBaseDir + "DemoScraper.kt", demoScraper)
 
     runBlocking {
-        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "demo_website/get_options/latest")
+        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
     }
 }

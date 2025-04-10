@@ -8,7 +8,7 @@ object Configurations {
     }
 
     val scrapersBaseDir: String by lazy {
-        dotenv["SCRAPERS_DIR"] ?: "$baseDir/scrapers/src/main/kotlin/"
+        dotenv["SCRAPERS_DIR"] ?: "$baseDir/scrapers/src/main/kotlin/scrapers/"
     }
 
     val snapshotBaseDir: String by lazy {

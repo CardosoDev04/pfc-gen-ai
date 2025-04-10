@@ -1,4 +1,4 @@
-package demo
+package scrapers
 
 import classes.data.BookingOption
 import interfaces.IScraper
@@ -21,18 +21,18 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(
                 driver,
-                Configurations.snapshotBaseDir + "demo_website/get_options/latest/step1"
+                Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step1"
             )
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button-new"))).click()
 
 
             val optionElements =
-                webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
+                webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title-new")))
 
             snapshotService.takeSnapshotAsFile(
                 driver,
-                Configurations.snapshotBaseDir + "demo_website/scrape/latest/step2"
+                Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step2"
             )
 
 
@@ -40,7 +40,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             return results
         } catch (e: Exception) {
-            snapshotService.takeSnapshotAsFile(driver, "kotlin/working/snapshots/demo_website/get_options/latest")
+            snapshotService.takeSnapshotAsFile(driver, "/working/snapshots/DemoScraper/latest")
             throw e
         }
     }
