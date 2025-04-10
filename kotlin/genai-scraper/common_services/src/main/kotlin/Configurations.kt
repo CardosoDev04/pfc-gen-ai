@@ -1,6 +1,17 @@
-object Configurations {
-    private val baseDir = System.getProperty("user.dir")
+import io.github.cdimascio.dotenv.dotenv
 
-    val scrapersBaseDir = "$baseDir/scrapers/src/main/kotlin/"
-    val snapshotBaseDir = "$baseDir/core/src/main/kotlin/snapshots/"
+object Configurations {
+    private val dotenv = dotenv()
+
+    private val baseDir: String by lazy {
+        dotenv["BASE_DIR"] ?: System.getProperty("user.dir")
+    }
+
+    val scrapersBaseDir: String by lazy {
+        dotenv["SCRAPERS_DIR"] ?: "$baseDir/scrapers/src/main/kotlin/"
+    }
+
+    val snapshotBaseDir: String by lazy {
+        dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots/"
+    }
 }
