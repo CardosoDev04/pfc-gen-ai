@@ -1,21 +1,15 @@
 package modification_detection
 
 import classes.data.Element
-import classes.llm.LLM
 import classes.service_model.Locator
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
-import domain.prompts.GET_MODIFICATION_PROMPT
-import domain.prompts.SCRAPER_UPDATE_PROMPT
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
 import ollama.ILLMClient
-import ollama.OllamaClient
 import html_fetcher.WebExtractor
 
 /**
@@ -25,6 +19,10 @@ import html_fetcher.WebExtractor
  */
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
+    private val getModificationModel: String,
+    private val getModificationSystemPrompt: String,
+    private val modifyScriptModel: String,
+    private val modifyScriptSystemPrompt: String
 ) : IModificationDetectionService {
 
     /**
@@ -61,8 +59,8 @@ class ModificationDetectionService(
         val modificationRequestJson = Json.encodeToString(ModificationRequest.serializer(), modificationRequest)
 
         val alternativeRequest = OllamaGenerateRequest(
-            model = LLM.Mistral7B.modelName,
-            system = GET_MODIFICATION_PROMPT,
+            model = getModificationModel,
+            system = getModificationSystemPrompt,
             prompt = modificationRequestJson,
             stream = false,
             raw = false
@@ -115,8 +113,8 @@ class ModificationDetectionService(
      */
     private suspend fun queryLLM(updateRequestJson: String): String {
         val ollamaRequest = OllamaGenerateRequest(
-            model = LLM.Mistral7B.modelName,
-            system = SCRAPER_UPDATE_PROMPT,
+            model = modifyScriptModel,
+            system = modifyScriptSystemPrompt,
             prompt = updateRequestJson,
             stream = false,
             raw = false

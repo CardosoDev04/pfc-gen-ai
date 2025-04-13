@@ -1,5 +1,6 @@
 package orchestrator
 
+import classes.llm.LLM
 import classes.llm.Model
 import classes.scrapers.DemoScraperDataBundle
 import com.cardoso.common.buildChromeDriver
@@ -8,6 +9,8 @@ import core.TestReportService
 import scrapers.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
+import domain.prompts.GET_MODIFICATION_PROMPT
+import domain.prompts.SCRAPER_UPDATE_PROMPT
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -181,7 +184,7 @@ fun main() {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
     val llmCli = OllamaClient(httpCli)
-    val mds = ModificationDetectionService(llmCli)
+    val mds = ModificationDetectionService(llmCli, LLM.Mistral7B.modelName, SCRAPER_UPDATE_PROMPT, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
 
     val snapshotServ = SnapshotService()
     val timeStampService = TimeStampService()
