@@ -184,7 +184,13 @@ fun main() {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
     val llmCli = OllamaClient(httpCli)
-    val mds = ModificationDetectionService(llmCli, LLM.Mistral7B.modelName, SCRAPER_UPDATE_PROMPT, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
+    val mds = ModificationDetectionService(
+        llmClient = llmCli,
+        getModificationModel = LLM.Mistral7B.modelName,
+        getModificationSystemPrompt =SCRAPER_UPDATE_PROMPT,
+        modifyScriptModel = LLM.Mistral7B.modelName,
+        modifyScriptSystemPrompt = GET_MODIFICATION_PROMPT
+    )
 
     val snapshotServ = SnapshotService()
     val timeStampService = TimeStampService()
