@@ -1,6 +1,5 @@
 import classes.llm.LLM
 import domain.prompts.GET_MODIFICATION_PROMPT
-import domain.prompts.SCRAPER_UPDATE_PROMPT
 import kotlinx.coroutines.runBlocking
 import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
@@ -33,7 +32,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -62,7 +61,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                 </form>
@@ -103,7 +102,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -131,7 +130,7 @@ class ModificationDetectionServiceTests {
                         <label for="email">Email:</label>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -173,7 +172,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                         <textarea id="message" name="message" rows="4" required></textarea>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
@@ -202,7 +201,7 @@ class ModificationDetectionServiceTests {
                         <input type="email" id="email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="message">Message:</label>
+                        <label for="message">domain.modification.requests.Message:</label>
                     </div>
                     <button type="submit" id="submit-button">Submit</button>
                 </form>
@@ -303,6 +302,6 @@ class ModificationDetectionServiceTests {
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .build()
         private val ollamaClient = OllamaClient(httpClient)
-            private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, SCRAPER_UPDATE_PROMPT, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
+            private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
     }
 }

@@ -10,7 +10,6 @@ import scrapers.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import domain.prompts.GET_MODIFICATION_PROMPT
-import domain.prompts.SCRAPER_UPDATE_PROMPT
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -40,7 +39,6 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 fun findLastCreatedDirectory(directoryPath: String): File? {
-    println(directoryPath)
     val directory = File(directoryPath)
     if (!directory.exists() || !directory.isDirectory) {
         throw IllegalArgumentException("The provided path is not a valid directory")
@@ -75,7 +73,13 @@ class Orchestrator(
         val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
         val modifications = modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
 
-        val newScript = modificationDetectionService.modifyScript(oldScraper.code, modifications)
+        val newScript = when(modelName) {
+            LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
+            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            else -> throw Exception("Unrecognized model name.")
+        }
 
         filePersistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
@@ -175,6 +179,11 @@ class Orchestrator(
             throw RuntimeException("Scraper tests failed")
         }
     }
+
+    companion object {
+        val modelName = LLM.Gemma3_1B.modelName
+        var prompt = CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
+    }
 }
 
 fun main() {
@@ -184,12 +193,11 @@ fun main() {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
     val llmCli = OllamaClient(httpCli)
+
     val mds = ModificationDetectionService(
         llmClient = llmCli,
         getModificationModel = LLM.Mistral7B.modelName,
-        getModificationSystemPrompt =SCRAPER_UPDATE_PROMPT,
-        modifyScriptModel = LLM.Mistral7B.modelName,
-        modifyScriptSystemPrompt = GET_MODIFICATION_PROMPT
+        getModificationSystemPrompt = GET_MODIFICATION_PROMPT
     )
 
     val snapshotServ = SnapshotService()
