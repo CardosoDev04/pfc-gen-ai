@@ -1,6 +1,6 @@
 package domain.prompts
 
-const val SCRAPER_UPDATE_PROMPT = """
+const val MISTRAL_SCRAPER_UPDATE_PROMPT = """
     ## ROLE
     You are an AI assistant specialized in updating Selenium scrapers when element locators change. Your primary task is to replace old locators with new ones while keeping the rest of the code untouched. You can, in some cases, modify code logic if the changes made to the website are substantial enough that the current logic doesn't apply.
 
