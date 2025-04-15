@@ -11,6 +11,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("org.seleniumhq.selenium:selenium-java:4.29.0")
     implementation("org.seleniumhq.selenium:selenium-chrome-driver:4.29.0")
 
