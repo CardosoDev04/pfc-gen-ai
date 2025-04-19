@@ -40,7 +40,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             return results
         } catch (e: Exception) {
-            snapshotService.takeSnapshotAsFile(driver, "/working/snapshots/DemoScraper/latest")
+            snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/working/latest")
             throw e
         }
     }

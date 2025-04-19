@@ -6,10 +6,11 @@ import classes.scrapers.DemoScraperDataBundle
 import com.cardoso.common.buildChromeDriver
 import core.ExecutionTracker
 import core.TestReportService
-import scrapers.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
+import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
 import domain.prompts.GET_MODIFICATION_PROMPT
+import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -30,6 +31,7 @@ import org.openqa.selenium.TimeoutException
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import persistence.implementations.FilePersistenceService
+import scrapers.DemoScraper
 import snapshots.ISnapshotService
 import snapshots.SnapshotService
 import utils.TimeStampService
@@ -181,8 +183,8 @@ class Orchestrator(
     }
 
     companion object {
-        val modelName = LLM.Gemma3_1B.modelName
         var prompt = CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
+        val modelName = LLM.Gemma3_1B.modelName
     }
 }
 
