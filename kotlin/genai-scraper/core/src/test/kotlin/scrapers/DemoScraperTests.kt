@@ -1,7 +1,6 @@
 package scrapers
 
 import com.cardoso.common.buildChromeDriver
-import demo.DemoScraper
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import snapshots.SnapshotService

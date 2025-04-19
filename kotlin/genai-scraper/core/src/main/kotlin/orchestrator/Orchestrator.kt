@@ -6,6 +6,7 @@ import classes.scrapers.DemoScraperDataBundle
 import com.cardoso.common.buildChromeDriver
 import core.ExecutionTracker
 import core.TestReportService
+import scrapers.DemoScraper
 import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
@@ -31,7 +32,6 @@ import org.openqa.selenium.TimeoutException
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import persistence.implementations.FilePersistenceService
-import scrapers.DemoScraper
 import snapshots.ISnapshotService
 import snapshots.SnapshotService
 import utils.TimeStampService
@@ -79,9 +79,11 @@ class Orchestrator(
             LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
             LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
             LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
-            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.Gemma3_1B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
             else -> throw Exception("Unrecognized model name.")
         }
+
+        // TODO: Copy old script to other file so it is recoverable in case of failure
 
         filePersistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
