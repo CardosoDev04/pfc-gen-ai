@@ -1,13 +1,11 @@
 package orchestrator
 
+import classes.data.Element
 import classes.llm.LLM
-import classes.llm.Model
 import classes.scrapers.DemoScraperDataBundle
+import classes.service_model.Modification
 import com.cardoso.common.buildChromeDriver
-import core.ExecutionTracker
-import core.TestReportService
 import scrapers.DemoScraper
-import domain.interfaces.ITestReportService
 import domain.model.interfaces.IOrchestrator
 import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
 import domain.prompts.GET_MODIFICATION_PROMPT
@@ -15,7 +13,9 @@ import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import modification_detection.IModificationDetectionService
 import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
@@ -34,7 +34,6 @@ import persistence.PersistenceService
 import persistence.implementations.FilePersistenceService
 import snapshots.ISnapshotService
 import snapshots.SnapshotService
-import utils.TimeStampService
 import java.io.File
 import java.net.URLClassLoader
 import java.util.*
@@ -52,10 +51,8 @@ fun findLastCreatedDirectory(directoryPath: String): File? {
 class Orchestrator(
     private val modificationDetectionService: IModificationDetectionService,
     private val snapshotService: ISnapshotService,
-    private val testReportService: ITestReportService,
     private val webExtractor: WebExtractor,
-    private val filePersistenceService: PersistenceService,
-    private val model: Model,
+    private val persistenceService: PersistenceService,
     private val driver: WebDriver
 ) : IOrchestrator {
 
@@ -65,16 +62,31 @@ class Orchestrator(
      * @param oldScraper The old scraper instance.
      * @param retries The number of retries allowed if the scraper fails tests.
      */
-    override suspend fun correctScraper(oldScraper: IScraperData, stepName: String, retries: Int) {
-        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
-        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
-        val latestSnapshotHtml = latestSnapshot.html.readText()
-        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
+    override suspend fun correctScraper(oldScraper: IScraperData, modifications: List<Modification<Element>>, retries: Int): Boolean {
+        var currRetries = retries
+        var success = false
 
-        val modifiedElements = modificationDetectionService.getMissingElements(latestStableSnapshotHtml, latestSnapshotHtml)
-        val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
-        val modifications = modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
+        while (!success && currRetries > 0) {
+            println("Attempt ${retries - currRetries + 1}")
 
+            saveOldScript(oldScraper)
+            success = attemptCorrectingScraper(oldScraper, modifications)
+            currRetries--
+
+            if (!success) {
+                persistenceService.copyAndDeleteFile(Configurations.tempBaseDir + "${oldScraper.name}.kt", oldScraper.path)
+            }
+        }
+
+        return success
+    }
+
+    private fun saveOldScript(oldScraper: IScraperData) {
+        persistenceService.write(Configurations.tempBaseDir + "${oldScraper.name}.kt", oldScraper.code)
+    }
+
+    private suspend fun attemptCorrectingScraper(oldScraper: IScraperData, modifications: List<Modification<Element>>): Boolean {
+        // Get the fixed script from the LLM
         val newScript = when(modelName) {
             LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
             LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
@@ -83,50 +95,62 @@ class Orchestrator(
             else -> throw Exception("Unrecognized model name.")
         }
 
-        // TODO: Copy old script to other file so it is recoverable in case of failure
+        // Overwrite scraper's source code
+        persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
-        filePersistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
+        val newScraper = attemptToCompileAndInstantiateNewScraper(Configurations.scrapersBaseDir + "${oldScraper.name}.kt")
 
-        val newScraper = compileAndInstantiateNewScraper(Configurations.scrapersBaseDir + "${oldScraper.name}.kt")
+        if (newScraper == null) {
+            println("Compilation of the new scraper failed")
+            val oldScript = persistenceService.read(Configurations.tempBaseDir + "${oldScraper.name}.kt")
+            persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", oldScript)
+
+            return false
+        }
 
         try {
             testScraper(newScraper)
         } catch (e: Exception) {
-            println("Scraper did not pass automated tests. Retries left: $retries")
-            if (retries - 1 > 0) correctScraper(oldScraper, stepName,retries - 1)
-            throw Exception("Could not correct scraper: $e")
+            println("Scraper did not pass automated tests.")
+            return false
         }
+
+        return true
     }
 
     /**
      * Compiles and instantiates a new scraper from the given Kotlin file path.
      *
      * @param scraperCodePath The path to the Kotlin file containing the scraper code.
-     * @return The instantiated IScraper object.
-     * @throws RuntimeException If the compilation of the Kotlin file fails.
+     * @return The instantiated IScraper object or null in case of compilation failure.
      */
-    override suspend fun compileAndInstantiateNewScraper(scraperCodePath: String): IScraper {
-        val file = File(scraperCodePath)
-        val outputDir = file.parentFile
+    override suspend fun attemptToCompileAndInstantiateNewScraper(scraperCodePath: String): IScraper? = withContext(Dispatchers.IO){
+        try {
+            val file = File(scraperCodePath)
+            val outputDir = file.parentFile
 
-        // Get the current classpath
-        val classpath = System.getProperty("java.class.path")
+            // Get the current classpath
+            val classpath = System.getProperty("java.class.path")
 
-        // Compile the Kotlin file using kotlinc
-        val process = ProcessBuilder(
-            "kotlinc", file.path, "-d", outputDir.path , "-classpath", classpath
-        ).inheritIO().start()
-        val exitCode = process.waitFor()
-        if (exitCode != 0) {
-            file.delete()
-            throw RuntimeException("Failed to compile Kotlin file: $scraperCodePath")
+            // Compile the Kotlin file using kotlinc
+            val process = ProcessBuilder("kotlinc", file.path, "-d", outputDir.path , "-classpath", classpath)
+                .start()
+
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                file.delete()
+                return@withContext null
+            }
+
+            val newClassLoader = URLClassLoader.newInstance(arrayOf(outputDir.toURI().toURL()), this::class.java.classLoader)
+            val className = file.nameWithoutExtension.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+            val clazz = newClassLoader.loadClass("scrapers.$className")
+
+            return@withContext clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java).newInstance(driver, snapshotService) as IScraper
+
+        } catch (e: RuntimeException) {
+            return@withContext null
         }
-
-        val newClassLoader = URLClassLoader.newInstance(arrayOf(outputDir.toURI().toURL()), this::class.java.classLoader)
-        val className = file.nameWithoutExtension.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-        val clazz = newClassLoader.loadClass("scrapers.$className")
-
-        return clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java).newInstance(driver, snapshotService) as IScraper
     }
 
     /**
@@ -153,7 +177,13 @@ class Orchestrator(
             for (exception in exceptionsToCheck) {
                 if (exception.isInstance(e)) {
                     println("Caught exception: ${e::class.simpleName}")
-                    correctScraper(scraper, stepName, 3)
+                    val modifications = getModifications(scraper, stepName)
+                    val wasSuccessful = correctScraper(scraper, modifications)
+
+                    if (!wasSuccessful) {
+                        println("Scraper correction failed.")
+                    }
+
                     return
                 }
             }
@@ -167,7 +197,7 @@ class Orchestrator(
      *
      * @param scraper The scraper instance to test.
      */
-    override suspend fun testScraper(scraper: IScraper) {
+    override suspend fun testScraper(scraper: IScraper): Boolean {
         val summaryGeneratingListener = SummaryGeneratingListener()
 
         val request: LauncherDiscoveryRequest = LauncherDiscoveryRequestBuilder.request()
@@ -179,9 +209,19 @@ class Orchestrator(
         launcher.execute(request)
 
         val summary: TestExecutionSummary = summaryGeneratingListener.summary
-        if (summary.totalFailureCount > 0) {
-            throw RuntimeException("Scraper tests failed")
-        }
+
+        return summary.totalFailureCount.toInt() == 0
+    }
+
+    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
+        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
+        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
+        val latestSnapshotHtml = latestSnapshot.html.readText()
+        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
+
+        val modifiedElements = modificationDetectionService.getMissingElements(latestStableSnapshotHtml, latestSnapshotHtml)
+        val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
+        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
     }
 
     companion object {
@@ -205,9 +245,6 @@ fun main() {
     )
 
     val snapshotServ = SnapshotService()
-    val timeStampService = TimeStampService()
-    val executionTracker = ExecutionTracker(timeStampService)
-    val testReportServ = TestReportService(executionTracker, timeStampService)
     val webExtractor = WebExtractor()
     val fps = FilePersistenceService()
 
@@ -216,10 +253,8 @@ fun main() {
     val orchestrator = Orchestrator(
         modificationDetectionService = mds,
         snapshotService = snapshotServ,
-        testReportService = testReportServ,
         webExtractor = webExtractor,
-        filePersistenceService = fps,
-        model = Model("Mistral_7B", "mistral:7b", 7L, ""),
+        persistenceService = fps,
         driver
     )
 
