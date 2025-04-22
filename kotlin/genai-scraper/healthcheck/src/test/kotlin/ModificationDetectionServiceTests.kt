@@ -1,3 +1,5 @@
+import classes.llm.LLM
+import domain.prompts.GET_MODIFICATION_PROMPT
 import kotlinx.coroutines.runBlocking
 import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
@@ -300,6 +302,6 @@ class ModificationDetectionServiceTests {
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .build()
         private val ollamaClient = OllamaClient(httpClient)
-        private val mds = ModificationDetectionService(ollamaClient)
+            private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
     }
 }

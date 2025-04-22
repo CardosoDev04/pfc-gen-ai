@@ -1,14 +1,12 @@
 package modification_detection
 
 import classes.data.Element
-import classes.llm.LLM
 import classes.service_model.Locator
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
-import domain.prompts.GET_MODIFICATION_PROMPT
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
@@ -21,6 +19,8 @@ import html_fetcher.WebExtractor
  */
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
+    private val getModificationModel: String,
+    private val getModificationSystemPrompt: String,
 ) : IModificationDetectionService {
 
     /**
@@ -57,8 +57,8 @@ class ModificationDetectionService(
         val modificationRequestJson = Json.encodeToString(ModificationRequest.serializer(), modificationRequest)
 
         val alternativeRequest = OllamaGenerateRequest(
-            model = LLM.Mistral7B.modelName,
-            system = GET_MODIFICATION_PROMPT,
+            model = getModificationModel,
+            system = getModificationSystemPrompt,
             prompt = modificationRequestJson,
             stream = false,
             raw = false
@@ -76,14 +76,14 @@ class ModificationDetectionService(
      * @param modification The modification to apply.
      * @return The modified script.
      */
-    override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, prompt: String): String {
+    override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
         val locator = Locator(modification.old.locator, modification.new.locator)
         val importsRegex = Regex(".*?(?=\\bclass\\b)")
         val imports = importsRegex.find(oldScript)?.value ?: ""
         val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript, imports)
         val scraperUpdateRequestJson = Json.encodeToString(ScraperUpdateRequest.serializer(), scraperUpdateRequest)
 
-        return queryLLMJson(scraperUpdateRequestJson, modelName, prompt)
+        return queryLLMJson(scraperUpdateRequestJson, modelName, systemPrompt)
     }
 
     override suspend fun modifyCodeGenerationLLMScript(
@@ -126,10 +126,10 @@ class ModificationDetectionService(
      * @param updateRequestJson The update request JSON.
      * @return The updated script.
      */
-    private suspend fun queryLLMJson(updateRequestJson: String, modelName: String, prompt: String): String {
+    private suspend fun queryLLMJson(updateRequestJson: String, modelName: String, systemPrompt: String): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = modelName,
-            system = prompt,
+            system = systemPrompt,
             prompt = updateRequestJson,
             stream = false,
             raw = false

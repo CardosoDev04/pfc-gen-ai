@@ -1,4 +1,4 @@
-package demo
+package scrapers
 
 import classes.data.BookingOption
 import interfaces.IScraper
@@ -19,10 +19,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
             driver.get("http://localhost:5173/")
 
-            snapshotService.takeSnapshotAsFile(
-                driver,
-                "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest/step1"
-            )
+            snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step1")
 
             webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
 
@@ -32,7 +29,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(
                 driver,
-                "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/core/src/main/kotlin/snapshots/demo_website/get_options/latest/step2"
+                Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step2"
             )
 
 
@@ -40,7 +37,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             return results
         } catch (e: Exception) {
-            snapshotService.takeSnapshotAsFile(driver, "kotlin/working/snapshots/demo_website/get_options/latest")
+            snapshotService.takeSnapshotAsFile(driver, "kotlin/working/snapshots/${this::class.simpleName}/latest")
             throw e
         }
     }

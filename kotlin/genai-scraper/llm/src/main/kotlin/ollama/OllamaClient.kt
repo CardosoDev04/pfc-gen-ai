@@ -51,14 +51,3 @@ class OllamaClient(
         }
     }
 }
-
-fun main() {
-    val httpClient = OkHttpClient()
-    val client = OllamaClient(httpClient)
-
-    runBlocking {
-        val request = OllamaGenerateRequest(LLM.Mistral7B.modelName, "","What is your name?",stream=false, raw=true)
-        val response = client.generate(request)
-        println(response.response)
-    }
-}
