@@ -1,11 +1,11 @@
 package ollama
 
-import classes.llm.LLM
 import domain.http.Uris
+import domain.http.ollama.requests.OllamaChatRequest
 import domain.http.ollama.requests.OllamaGenerateRequest
+import domain.http.ollama.responses.OllamaChatResponse
 import domain.http.ollama.responses.OllamaGenerateResponse
 import domain.http.ollama.responses.OllamaTagsResponse
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,8 +21,8 @@ class OllamaClient(
 ): ILLMClient {
     private val mediaTypeJson = "application/json; charset=utf-8".toMediaType()
 
-    override suspend fun generate(ollamaChatRequest: OllamaGenerateRequest): OllamaGenerateResponse {
-        val requestBody = json.encodeToString(ollamaChatRequest).toRequestBody(mediaTypeJson)
+    override suspend fun generate(ollamaGenerateRequest: OllamaGenerateRequest): OllamaGenerateResponse {
+        val requestBody = json.encodeToString(ollamaGenerateRequest).toRequestBody(mediaTypeJson)
 
         val request = Request.Builder()
             .url(baseUrl + Uris.Ollama.GENERATE)
@@ -34,6 +34,22 @@ class OllamaClient(
 
             if (!response.isSuccessful) throw IOException("Unexpected code $response")
             json.decodeFromString<OllamaGenerateResponse>(responseBody)
+        }
+    }
+
+    override suspend fun chat(ollamaChatRequest: OllamaChatRequest): OllamaChatResponse {
+        val requestBody = json.encodeToString(ollamaChatRequest).toRequestBody(mediaTypeJson)
+
+        val request = Request.Builder()
+            .url(baseUrl + Uris.Ollama.CHAT)
+            .post(requestBody)
+            .build()
+
+        return httpClient.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string() ?: throw IOException("Empty response body")
+
+            if (!response.isSuccessful) throw IOException("Unexpected code $response")
+            json.decodeFromString<OllamaChatResponse>(responseBody)
         }
     }
 
