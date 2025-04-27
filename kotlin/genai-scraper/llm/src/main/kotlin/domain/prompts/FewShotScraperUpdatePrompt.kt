@@ -9,9 +9,8 @@ val FEW_SHOT_SCRAPER_UPDATE_MESSAGES = listOf(
         Always preserve and include the original import statements exactly as given.
         Modify only what is necessary (selectors, waits, interactions).
         Maintain original method return types (e.g., fun scrape(): String) exactly.
-        Respond only with a JSON object: { "updatedCode": "..." }.
         Use Kotlin syntax at all times.
-        No introductions, explanations, comments, or formatting like Markdown. Follow the example's response format.
+        Only respond with the updated code wrapped in ```kotlin ... ``` tags, with no explanations or additional text.
         Let's go through some examples:
     """.trimIndent()),
     Message("user", """{
@@ -25,10 +24,19 @@ val FEW_SHOT_SCRAPER_UPDATE_MESSAGES = listOf(
           ]
         }
     """.trimIndent()),
-    Message("assistant", """{
-          "updatedCode": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun main() {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"submit-button\"))\n  button.click()\n  driver.quit()\n}"
-        }
-    """.trimIndent()),
+    Message("assistant", """```kotlin
+import org.openqa.selenium.By
+import org.openqa.selenium.WebDriver
+import org.openqa.selenium.chrome.ChromeDriver
+
+fun main() {
+  val driver: WebDriver = ChromeDriver()
+  driver.get("https://example.com")
+  val button = driver.findElement(By.id("submit-button"))
+  button.click()
+  driver.quit()
+}
+```""".trimIndent()),
     Message("user", """{
           "imports": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver",
           "script": "fun scraper(): String {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"sign-in\"))\n  button.click()\n  driver.quit()\n  return \"Done\"\n}",
@@ -40,8 +48,18 @@ val FEW_SHOT_SCRAPER_UPDATE_MESSAGES = listOf(
           ]
         }
     """.trimIndent()),
-    Message("assistant", """{
-          "updatedCode": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver\n\nfun scraper(): String {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com\")\n  val button = driver.findElement(By.id(\"sign-in\"))\n  button.click()\n  driver.quit()\n  return \"Done\"\n}"
-        }
-    """.trimIndent())
+    Message("assistant", """```kotlin
+import org.openqa.selenium.By
+import org.openqa.selenium.WebDriver
+import org.openqa.selenium.chrome.ChromeDriver
+
+fun scraper(): String {
+  val driver: WebDriver = ChromeDriver()
+  driver.get("https://example.com")
+  val button = driver.findElement(By.id("sign-in"))
+  button.click()
+  driver.quit()
+  return "Done"
+}
+```""".trimIndent())
 )

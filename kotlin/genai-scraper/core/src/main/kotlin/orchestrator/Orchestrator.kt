@@ -87,7 +87,7 @@ class Orchestrator(
         // Get the fixed script from the LLM
         val newScript = when(modelName) {
             LLM.Mistral7B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.Mistral7B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
-            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt)
+            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
             LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.DeepSeekCoder1Point3B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
             LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.Gemma3_1B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
             else -> throw Exception("Unrecognized model name.")
@@ -113,6 +113,7 @@ class Orchestrator(
             return false
         }
 
+        println("Scraper tests were successful!")
         return true
     }
 
@@ -196,6 +197,7 @@ class Orchestrator(
      * @param scraper The scraper instance to test.
      */
     override suspend fun testScraper(scraper: IScraper): Boolean {
+        println("Testing scraper...")
         val summaryGeneratingListener = SummaryGeneratingListener()
 
         val request: LauncherDiscoveryRequest = LauncherDiscoveryRequestBuilder.request()
@@ -223,7 +225,7 @@ class Orchestrator(
     }
 
     companion object {
-        var prompt = ZERO_SHOT_SCRAPER_UPDATE_PROMPT
+        var prompt = FEW_SHOT_SCRAPER_UPDATE_MESSAGES
         val modelName = LLM.Gemma3_1B.modelName
     }
 }

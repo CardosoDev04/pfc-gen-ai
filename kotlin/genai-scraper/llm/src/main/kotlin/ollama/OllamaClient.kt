@@ -45,8 +45,14 @@ class OllamaClient(
             .post(requestBody)
             .build()
 
+        println("Request: ${request.method} ${request.url}")
+        println("Request Body: $requestBody")
+
         return httpClient.newCall(request).execute().use { response ->
             val responseBody = response.body?.string() ?: throw IOException("Empty response body")
+
+            println("Response Code: ${response.code}")
+            println("Response Body: $responseBody")
 
             if (!response.isSuccessful) throw IOException("Unexpected code $response")
 

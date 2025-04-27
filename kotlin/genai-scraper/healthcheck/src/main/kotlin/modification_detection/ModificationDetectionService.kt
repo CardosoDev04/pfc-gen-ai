@@ -109,7 +109,7 @@ class ModificationDetectionService(
 
         val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
 
-        return Json.decodeFromString<ScraperUpdateResponse>(response).updatedCode
+        return Json.decodeFromString<String>(response).cleanUpdateScriptResponseJson()
     }
 
     override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
@@ -129,7 +129,7 @@ class ModificationDetectionService(
 
         val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
 
-        return Json.decodeFromString<ScraperUpdateResponse>(response).updatedCode
+        return response
     }
 
     private suspend fun queryLLMJson(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
@@ -164,23 +164,11 @@ class ModificationDetectionService(
     }
 
     private fun String.cleanUpdateScriptResponseJson(): String {
-        // Ensure we keep the 'package' statement and everything after it
-        val cleanedScript = this.substringAfter("\npackage ", missingDelimiterValue = this)
+         val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
 
-        // Restore 'package' keyword if it was the first line
-        val restoredScript = if (this.startsWith("package ")) "package $cleanedScript" else cleanedScript
-
-        // Remove formatting artifacts
-        return restoredScript
-            .replace(Regex("^```\\w*\\s*"), "") // Remove leading ```json, ```kotlin, ```scala, etc.
-            .replace(Regex("```"), "") // Remove trailing ```
-            .replace(Regex("^'''\\w*\\s*"), "") // Remove leading '''json, '''kotlin, etc.
-            .replace(Regex("'''"), "") // Remove trailing '''
-            .replace("json", "")
-            .replace("json", "")
-            .replace("kotlin", "")
-            .replace("scala", "")
-            .trim() // Trim unnecessary whitespace
+        val matchResult = regex.find(this)
+        val code = matchResult?.groups?.get(1)?.value
+        return code ?: ""
     }
 
     private fun getImports(script: String): String {
