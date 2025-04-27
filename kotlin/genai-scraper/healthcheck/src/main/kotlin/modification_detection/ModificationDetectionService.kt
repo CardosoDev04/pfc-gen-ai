@@ -2,7 +2,7 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.Message
-import classes.service_model.Locator
+import classes.service_model.CssSelector
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaChatRequest
 import domain.http.ollama.requests.OllamaGenerateRequest
@@ -51,6 +51,7 @@ class ModificationDetectionService(
             stream = false,
             raw = false
         )
+
         val alternativeResponseJson = llmClient.generate(alternativeRequest).response
         val alternativeElement = Json.decodeFromString<Element>(alternativeResponseJson)
 
@@ -58,9 +59,9 @@ class ModificationDetectionService(
     }
 
     override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
-        val locator = Locator(modification.old.locator, modification.new.locator)
+        val cssSelector = CssSelector(modification.old.locator, modification.new.locator)
         val imports = getImports(oldScript)
-        val scraperUpdateRequest = ScraperUpdateRequest(listOf(locator), oldScript, imports)
+        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
         return queryLLMJson(scraperUpdateRequest, modelName, systemPrompt)
     }
@@ -80,32 +81,55 @@ class ModificationDetectionService(
         return queryLLMString(systemPrompt, modelName, updatedPrompt)
     }
 
-    override suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, prompt: String): String {
+    override suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
-        val scraperUpdateRequest = ScraperUpdateRequest(locators, oldScript, imports)
+        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
 
-        return queryLLMJson(scraperUpdateRequest, modelName, prompt)
+        return queryLLMJson(scraperUpdateRequest, modelName, systemPrompt)
     }
 
-    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String, prompt: String): String {
-        val locators = getLocators(modifications).toString()
+    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
+        val locators = getLocators(modifications)
         val imports = getImports(oldScript)
 
-        val updatedPrompt = getUpdatedPrompt(prompt, oldScript, imports, locators)
+        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
 
         val messages = listOf(
             Message(role = "system", content = systemPrompt),
-            Message(role = "user", content = updatedPrompt)
+            Message(role = "user", content = Json.encodeToString(scraperUpdateRequest))
         )
 
         val chatRequest = OllamaChatRequest(
             model = modelName,
             stream = false,
+            raw = false,
             messages = messages
         )
 
-        return llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
+        val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
+
+        return Json.decodeFromString<ScraperUpdateResponse>(response).updatedCode
+    }
+
+    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
+        val locators = getLocators(modifications)
+        val imports = getImports(oldScript)
+
+        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
+
+        val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
+
+        val chatRequest = OllamaChatRequest(
+            model = modelName,
+            stream = false,
+            raw = false,
+            messages = updatedMessages
+        )
+
+        val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
+
+        return Json.decodeFromString<ScraperUpdateResponse>(response).updatedCode
     }
 
     private suspend fun queryLLMJson(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
@@ -160,12 +184,12 @@ class ModificationDetectionService(
     }
 
     private fun getImports(script: String): String {
-        val importsRegex = Regex(".*?(?=\\bclass\\b)")
+        val importsRegex = Regex("package[\\s\\S]*?(?=\\bclass\\b)")
         return importsRegex.find(script)?.value ?: ""
     }
 
-    private fun getLocators(modifications: List<Modification<Element>>): List<Locator> {
-        return modifications.map { m -> Locator(m.old.locator, m.new.locator) }
+    private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
+        return modifications.map { m -> CssSelector(m.old.locator, m.new.locator) }
     }
 
     private fun getUpdatedPrompt(prompt: String, oldScript: String, imports: String, locators: String): String {

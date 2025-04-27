@@ -9,9 +9,6 @@ import org.openqa.selenium.support.ui.WebDriverWait
 import snapshots.ISnapshotService
 import java.time.Duration
 
-/**interface IDemoScraper {
-fun getBookingOptions(): List<BookingOption>
-}**/
 
 class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
     override suspend fun scrape(): List<BookingOption> {

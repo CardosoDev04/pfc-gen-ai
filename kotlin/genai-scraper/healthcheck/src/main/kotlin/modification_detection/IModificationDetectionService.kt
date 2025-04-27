@@ -1,6 +1,7 @@
 package modification_detection
 
 import classes.data.Element
+import classes.llm.Message
 import classes.service_model.Modification
 
 interface IModificationDetectionService {
@@ -50,7 +51,7 @@ interface IModificationDetectionService {
      * @param modifications The list of modifications to apply.
      * @return The modified script.
      */
-    suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, prompt: String): String
+    suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String
 
     /**
      * Modified the script based on a list of modifications using a chat history.
@@ -59,8 +60,18 @@ interface IModificationDetectionService {
      * @param modifications The list of modifications to apply.
      * @param modelName The name of the model to use.
      * @param systemPrompt The system prompt to feed to the model.
-     * @param prompt The prompt to feed to the model.
      * @return The modified script.
      */
-    suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String, prompt: String): String
+    suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String
+
+    /**
+     * Modified the script based on a list of modifications using a chat history.
+     *
+     * @param oldScript The old script.
+     * @param modifications The list of modifications to apply.
+     * @param modelName The name of the model to use.
+     * @param messages The messages simulating a conversation.
+     * @return The modified script.
+     */
+    suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String
 }

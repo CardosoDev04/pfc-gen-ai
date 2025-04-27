@@ -49,6 +49,7 @@ class OllamaClient(
             val responseBody = response.body?.string() ?: throw IOException("Empty response body")
 
             if (!response.isSuccessful) throw IOException("Unexpected code $response")
+
             json.decodeFromString<OllamaChatResponse>(responseBody)
         }
     }

@@ -7,5 +7,6 @@ import kotlinx.serialization.Serializable
 data class OllamaChatRequest(
     val model: String,
     val stream: Boolean,
+    val raw: Boolean,
     val messages: List<Message>
 )
