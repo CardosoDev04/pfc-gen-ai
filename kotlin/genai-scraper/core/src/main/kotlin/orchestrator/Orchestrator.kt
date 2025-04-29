@@ -5,11 +5,8 @@ import classes.llm.LLM
 import classes.scrapers.DemoScraperDataBundle
 import classes.service_model.Modification
 import com.cardoso.common.buildChromeDriver
-import scrapers.DemoScraper
 import domain.model.interfaces.IOrchestrator
-import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM
-import domain.prompts.GET_MODIFICATION_PROMPT
-import domain.prompts.CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
+import domain.prompts.*
 import interfaces.IScraperData
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -32,6 +29,7 @@ import org.openqa.selenium.TimeoutException
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import persistence.implementations.FilePersistenceService
+import scrapers.DemoScraper
 import snapshots.ISnapshotService
 import snapshots.SnapshotService
 import java.io.File
@@ -88,10 +86,10 @@ class Orchestrator(
     private suspend fun attemptCorrectingScraper(oldScraper: IScraperData, modifications: List<Modification<Element>>): Boolean {
         // Get the fixed script from the LLM
         val newScript = when(modelName) {
-            LLM.Mistral7B.modelName -> modificationDetectionService.modifyMistralScript(oldScraper.code, modifications, modelName, prompt)
-            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
-            LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
-            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyCodeGenerationLLMScript(oldScraper.code, modifications, LLM.Gemma3_1B.modelName, CODE_LLAMA_SCRAPER_UPDATE_PROMPT_SYSTEM, prompt )
+            LLM.Mistral7B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.Mistral7B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
+            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.CodeLlama7B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
+            LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.DeepSeekCoder1Point3B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
+            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyScriptChatHistory(oldScraper.code, modifications, LLM.Gemma3_1B.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
             else -> throw Exception("Unrecognized model name.")
         }
 
@@ -115,6 +113,7 @@ class Orchestrator(
             return false
         }
 
+        println("Scraper tests were successful!")
         return true
     }
 
@@ -198,6 +197,7 @@ class Orchestrator(
      * @param scraper The scraper instance to test.
      */
     override suspend fun testScraper(scraper: IScraper): Boolean {
+        println("Testing scraper...")
         val summaryGeneratingListener = SummaryGeneratingListener()
 
         val request: LauncherDiscoveryRequest = LauncherDiscoveryRequestBuilder.request()
@@ -225,8 +225,8 @@ class Orchestrator(
     }
 
     companion object {
-        var prompt = CODE_LLAMA_SCRAPER_UPDATE_PROMPT_USER
-        val modelName = LLM.Gemma3_1B.modelName
+        var prompt = FEW_SHOT_SCRAPER_UPDATE_MESSAGES
+        val modelName = LLM.Llama8B.modelName
     }
 }
 

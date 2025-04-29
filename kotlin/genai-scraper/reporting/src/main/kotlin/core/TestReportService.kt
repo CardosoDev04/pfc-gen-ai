@@ -58,34 +58,3 @@ class TestReportService (
         return TestReport(htmlTemplate, timeStampService.getCurrentTimestamp())
     }
 }
-
-
-fun main() {
-    val timeStampService = TimeStampService()
-    val executionTracker = ExecutionTracker(timeStampService)
-    val testReportService = TestReportService(executionTracker, timeStampService)
-
-    suspend fun testSuspend() {
-        withContext(Dispatchers.IO) {
-            Thread.sleep(1000)
-            return@withContext "Suspend result"
-        }
-    }
-
-    fun testSynchronous(): String {
-        return "Non-suspend result"
-    }
-
-    suspend fun someWork(executionTracker: IExecutionTracker) {
-        executionTracker.recordStep("Synchronous operation") { testSynchronous() }
-        executionTracker.recordSuspendStep("Suspend operation") { testSuspend() }
-    }
-
-    runBlocking {
-        someWork(executionTracker)
-    }
-
-    val report = testReportService.generateTestReport("Some Work")
-
-    println(report)
-}

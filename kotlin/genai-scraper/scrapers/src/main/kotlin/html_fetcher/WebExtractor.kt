@@ -54,17 +54,3 @@ class WebExtractor {
         }
     }
 }
-
-fun main() {
-    val webExtractor = WebExtractor()
-    val elements = webExtractor.getInteractiveElementsHTML("")
-
-    elements.forEach { element ->
-        println("Type: ${element.type}, CSS Selector: ${element.locator}, Text: ${element.text}")
-    }
-
-}
-
-
-
-
