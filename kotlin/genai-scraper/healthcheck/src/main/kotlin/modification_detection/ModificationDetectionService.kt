@@ -99,9 +99,7 @@ class ModificationDetectionService(
             messages = messages
         )
 
-        val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
-
-        return Json.decodeFromString<String>(response)
+        return llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
     }
 
     private suspend fun modifyScriptUnitary(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
@@ -113,12 +111,10 @@ class ModificationDetectionService(
             raw = false
         )
 
-        val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        val cleanedScriptResponseJson = updateScriptResponseJson.cleanUpdateScriptResponseJson()
-        val json = Json {
-            ignoreUnknownKeys = true
-        }
-        val updateScriptResponse = json.decodeFromString<ScraperUpdateResponse>(cleanedScriptResponseJson)
+        val updateScriptResponseJson = llmClient.generate(ollamaRequest).response.cleanUpdateScriptResponseJson()
+
+        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
+
         return updateScriptResponse.updatedCode
     }
 

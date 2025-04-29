@@ -226,7 +226,7 @@ class Orchestrator(
 
     companion object {
         var prompt = FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-        val modelName = LLM.Gemma3_1B.modelName
+        val modelName = LLM.Llama8B.modelName
     }
 }
 
