@@ -33,15 +33,6 @@ interface IModificationDetectionService {
     suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String
 
     /**
-     * Modifies the script based on a list of modifications.
-     *
-     * @param oldScript The old script.
-     * @param modifications The list of modifications to apply.
-     * @return The modified script.
-     */
-    suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String
-
-    /**
      * Modified the script based on a list of modifications using a chat history.
      *
      * @param oldScript The old script.

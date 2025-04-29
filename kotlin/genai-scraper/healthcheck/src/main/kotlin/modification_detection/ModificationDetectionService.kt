@@ -66,14 +66,6 @@ class ModificationDetectionService(
         return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
     }
 
-    override suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
-        val locators = getLocators(modifications)
-        val imports = getImports(oldScript)
-        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
-
-        return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
-    }
-
     override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
@@ -85,16 +77,7 @@ class ModificationDetectionService(
             Message(role = "user", content = Json.encodeToString(scraperUpdateRequest))
         )
 
-        val chatRequest = OllamaChatRequest(
-            model = modelName,
-            stream = false,
-            raw = false,
-            messages = messages
-        )
-
-        val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
-
-        return Json.decodeFromString<String>(response)
+        return getModifiedScript(modelName, messages)
     }
 
     override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
@@ -105,16 +88,20 @@ class ModificationDetectionService(
 
         val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
 
+        return getModifiedScript(modelName, updatedMessages)
+    }
+
+    private suspend fun getModifiedScript(modelName: String, messages: List<Message>): String {
         val chatRequest = OllamaChatRequest(
             model = modelName,
             stream = false,
             raw = false,
-            messages = updatedMessages
+            messages = messages
         )
 
         val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
 
-        return response
+        return Json.decodeFromString<String>(response)
     }
 
     private suspend fun modifyScriptUnitary(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
