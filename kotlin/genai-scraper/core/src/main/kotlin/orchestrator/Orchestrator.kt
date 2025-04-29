@@ -264,11 +264,7 @@ fun main() {
     val demoScraper = DemoScraper(driver, snapshotServ)
     val demoScraperBundle = DemoScraperDataBundle(Configurations.scrapersBaseDir + "DemoScraper.kt", demoScraper)
 
-    runBlocking {
-        orchestrator.getModifications(demoScraperBundle, "step2")
-    }
-
-//    runBlocking {
-//        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
-//    }
+   runBlocking {
+       orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
+   }
 }
