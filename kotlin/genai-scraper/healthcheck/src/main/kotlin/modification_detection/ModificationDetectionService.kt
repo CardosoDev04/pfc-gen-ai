@@ -12,7 +12,6 @@ import domain.modification.responses.ScraperUpdateResponse
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
-import html_fetcher.WebExtractor
 import kotlinx.serialization.encodeToString
 
 /**
@@ -25,15 +24,10 @@ class ModificationDetectionService(
     private val getModificationModel: String,
     private val getModificationSystemPrompt: String,
 ) : IModificationDetectionService {
-    override suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element> {
-        val webExtractor = WebExtractor()
-
-        val previousElements = webExtractor.getInteractiveElementsHTML(previousHTMLState)
-        val newElements = webExtractor.getInteractiveElementsHTML(newHTMLState)
-
+    override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
-                previousElement.locator == newElement.locator
+                previousElement.cssSelector == newElement.cssSelector
             }
         }
     }
@@ -59,7 +53,7 @@ class ModificationDetectionService(
     }
 
     override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
-        val cssSelector = CssSelector(modification.old.locator, modification.new.locator)
+        val cssSelector = CssSelector(modification.old.cssSelector, modification.new.cssSelector)
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
@@ -132,6 +126,6 @@ class ModificationDetectionService(
     }
 
     private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
-        return modifications.map { m -> CssSelector(m.old.locator, m.new.locator) }
+        return modifications.map { m -> CssSelector(m.old.cssSelector, m.new.cssSelector) }
     }
 }

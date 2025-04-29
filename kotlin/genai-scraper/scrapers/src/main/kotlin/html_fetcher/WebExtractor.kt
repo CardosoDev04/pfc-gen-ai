@@ -1,7 +1,6 @@
 package html_fetcher
 
 import classes.data.Element
-import com.cardoso.common.buildChromeDriver
 import org.jsoup.Jsoup
 import org.openqa.selenium.JavascriptExecutor
 import org.openqa.selenium.WebDriver
@@ -9,9 +8,6 @@ import org.openqa.selenium.WebElement
 
 
 class WebExtractor {
-
-    private val driver: WebDriver = buildChromeDriver(true)
-
     fun getCssSelector(driver: WebDriver, element: WebElement): String {
         val jsScript = """
         function getCssSelector(el) {
@@ -41,14 +37,45 @@ class WebExtractor {
         return (driver as JavascriptExecutor).executeScript(jsScript, element) as String
     }
 
-    fun getInteractiveElementsHTML(html: String): List<Element> {
+    fun getRelevantHTMLElements(html: String): List<Element> {
         val document = Jsoup.parse(html)
-        val selectors = listOf("a", "button", "input", "select", "textarea", "label", "[onclick]", "[tabindex]", "[role=button]", "[role=link]")
 
-        return document.select(selectors.joinToString(", ")).map { element ->
+        // Retrieve all elements that are likely to be relevant from the received HTML
+        val relevantElements = document.select(
+            """
+            a,
+            button,
+            input,
+            select,
+            textarea,
+            label,
+            [onclick],
+            [tabindex],
+            [role=button],
+            [role=link]
+        """.trimIndent())
+
+        // Retrieve elements that contain text. Likely containing important information that should be scraped
+        val elementsWithText = document.allElements.filter { elem -> elem.text().isNotBlank() &&
+                    elem.tagName() != "script" &&
+                    elem.tagName() != "head" &&
+                    elem.tagName() != "title" &&
+                    elem.tagName() != "#root" &&
+                    elem.tagName() != "html" &&
+                    elem.tagName() != "body"
+        }
+
+        val combinedElements = (relevantElements + elementsWithText).distinctBy { it.cssSelector() }
+
+        // Filter out elements whose ancestors are already in the list
+        val filteredElements = combinedElements.filter { element ->
+            combinedElements.none { other -> other != element && other.parents().contains(element) }
+        }
+
+        return filteredElements.map { element ->
             Element(
                 type = element.tagName(),
-                locator = element.cssSelector(),
+                cssSelector = element.cssSelector(),
                 text = element.ownText().trim()
             )
         }

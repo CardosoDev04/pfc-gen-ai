@@ -1,5 +1,6 @@
 import classes.llm.LLM
 import domain.prompts.GET_MODIFICATION_PROMPT
+import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
@@ -70,12 +71,14 @@ class ModificationDetectionServiceTests {
         """.trimIndent()
 
             // When: calling getMissingElements
-            val missing = mds.getMissingElements(previousHtml, newHtml)
+        val previousElements = webExtractor.getRelevantHTMLElements(previousHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(newHtml)
+        val missing = mds.getMissingElements(previousElements, newElements)
 
             // Then: The missing element is correctly returned
             assertEquals(1, missing.size)
             assertEquals("BUTTON", missing[0].type)
-            assertEquals("#submit-button", missing[0].locator)
+            assertEquals("#submit-button", missing[0].cssSelector)
             assertEquals("Submit", missing[0].text)
         }
 
@@ -140,12 +143,14 @@ class ModificationDetectionServiceTests {
         """.trimIndent()
 
         // When: Calling getMissingElements
-        val missing = mds.getMissingElements(previousHtml, newHtml)
+        val previousElements = webExtractor.getRelevantHTMLElements(previousHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(newHtml)
+        val missing = mds.getMissingElements(previousElements, newElements)
 
         // Then: The missing elements are correctly returned
         assertEquals(1, missing.size)
         assertEquals("INPUT", missing[0].type)
-        assertEquals("#email", missing[0].locator)
+        assertEquals("#email", missing[0].cssSelector)
         assertEquals("", missing[0].text)
     }
 
@@ -210,12 +215,14 @@ class ModificationDetectionServiceTests {
         """.trimIndent()
 
         // When: Calling getMissingElements
-        val missing = mds.getMissingElements(previousHtml, newHtml)
+        val previousElements = webExtractor.getRelevantHTMLElements(previousHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(newHtml)
+        val missing = mds.getMissingElements(previousElements, newElements)
 
         // Then: The missing element is correctly returned
         assertEquals(1, missing.size)
         assertEquals("TEXTAREA", missing[0].type)
-        assertEquals("#message", missing[0].locator)
+        assertEquals("#message", missing[0].cssSelector)
         assertEquals("", missing[0].text)
     }
 
@@ -283,7 +290,9 @@ class ModificationDetectionServiceTests {
         """.trimIndent()
 
         // When: Calling getMissingElements
-        val missing = mds.getMissingElements(previousHtml, newHtml)
+        val previousElements = webExtractor.getRelevantHTMLElements(previousHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(newHtml)
+        val missing = mds.getMissingElements(previousElements, newElements)
 
         missing.forEach { println(it) }
 
@@ -291,8 +300,8 @@ class ModificationDetectionServiceTests {
         assertEquals(3, missing.size)
         assertEquals(2, missing.filter { elem -> elem.type == "BUTTON" }.size)
         assertTrue(missing.any { elem -> elem.type == "DIV" })
-        assertTrue(missing.any { elem -> elem.locator == "signup-button" })
-        assertTrue(missing.any { elem -> elem.locator == "search-button" })
+        assertTrue(missing.any { elem -> elem.cssSelector == "signup-button" })
+        assertTrue(missing.any { elem -> elem.cssSelector == "search-button" })
         assertTrue(missing.any { elem -> elem.text == "Sign Up" })
         assertTrue(missing.any { elem -> elem.text == "Search" })
     }
@@ -303,5 +312,7 @@ class ModificationDetectionServiceTests {
             .build()
         private val ollamaClient = OllamaClient(httpClient)
             private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
+
+        val webExtractor = WebExtractor()
     }
 }

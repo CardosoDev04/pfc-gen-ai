@@ -213,14 +213,17 @@ class Orchestrator(
         return summary.totalFailureCount.toInt() == 0
     }
 
-    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
+    suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
         val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
         val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
         val latestSnapshotHtml = latestSnapshot.html.readText()
         val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
 
-        val modifiedElements = modificationDetectionService.getMissingElements(latestStableSnapshotHtml, latestSnapshotHtml)
-        val newElements = webExtractor.getInteractiveElementsHTML(latestSnapshotHtml)
+        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
+
+        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
+
         return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
     }
 
@@ -262,6 +265,10 @@ fun main() {
     val demoScraperBundle = DemoScraperDataBundle(Configurations.scrapersBaseDir + "DemoScraper.kt", demoScraper)
 
     runBlocking {
-        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
+        orchestrator.getModifications(demoScraperBundle, "step2")
     }
+
+//    runBlocking {
+//        orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
+//    }
 }

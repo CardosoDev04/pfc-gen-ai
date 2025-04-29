@@ -8,11 +8,11 @@ interface IModificationDetectionService {
     /**
      * Gets the missing elements between the previous and new HTML states.
      *
-     * @param previousHTMLState The previous HTML state.
-     * @param newHTMLState The new HTML state.
+     * @param previousElements The elements present in the previous HTML state.
+     * @param newElements The elements present in the new HTML state.
      * @return A list of missing elements.
      */
-    suspend fun getMissingElements(previousHTMLState: String, newHTMLState: String): List<Element>
+    suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element>
 
     /**
      * Gets the modification for a modified element.
