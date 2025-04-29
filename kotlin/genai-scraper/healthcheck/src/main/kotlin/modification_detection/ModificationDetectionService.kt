@@ -63,22 +63,7 @@ class ModificationDetectionService(
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
-        return queryLLMJson(scraperUpdateRequest, modelName, systemPrompt)
-    }
-
-    override suspend fun modifyCodeGenerationLLMScript(
-        oldScript: String,
-        modifications: List<Modification<Element>>,
-        modelName: String,
-        systemPrompt: String,
-        prompt: String
-    ): String {
-        val locators = getLocators(modifications).toString()
-        val imports = getImports(oldScript)
-
-        val updatedPrompt = getUpdatedPrompt(prompt, oldScript, imports, locators)
-
-        return queryLLMString(systemPrompt, modelName, updatedPrompt)
+        return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
     }
 
     override suspend fun modifyMistralScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
@@ -86,7 +71,7 @@ class ModificationDetectionService(
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
 
-        return queryLLMJson(scraperUpdateRequest, modelName, systemPrompt)
+        return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
     }
 
     override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
@@ -132,7 +117,7 @@ class ModificationDetectionService(
         return response
     }
 
-    private suspend fun queryLLMJson(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
+    private suspend fun modifyScriptUnitary(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = modelName,
             system = systemPrompt,
@@ -150,19 +135,6 @@ class ModificationDetectionService(
         return updateScriptResponse.updatedCode
     }
 
-    private suspend fun queryLLMString(systemPrompt: String, modelName: String, prompt: String): String {
-        val ollamaRequest = OllamaGenerateRequest(
-            model = modelName,
-            system = systemPrompt,
-            prompt = prompt,
-            stream = false,
-            raw = false
-        )
-
-        val updateScriptResponseJson = llmClient.generate(ollamaRequest).response
-        return updateScriptResponseJson
-    }
-
     private fun String.cleanUpdateScriptResponseJson(): String {
          val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
 
@@ -178,14 +150,5 @@ class ModificationDetectionService(
 
     private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
         return modifications.map { m -> CssSelector(m.old.locator, m.new.locator) }
-    }
-
-    private fun getUpdatedPrompt(prompt: String, oldScript: String, imports: String, locators: String): String {
-        var updatedPrompt = prompt
-        updatedPrompt = updatedPrompt.replace("{code}", oldScript)
-        updatedPrompt = updatedPrompt.replace("{imports}", imports)
-        updatedPrompt = updatedPrompt.replace("{locator_changes}", locators)
-
-        return updatedPrompt
     }
 }

@@ -33,18 +33,6 @@ interface IModificationDetectionService {
     suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String
 
     /**
-     * Modifies the script using a code generation LLM.
-     *
-     * @param oldScript The old script.
-     * @param modifications The list of modifications to apply.
-     * @param modelName The name of the model to use.
-     * @param systemPrompt The system prompt to feed to the model.
-     * @param prompt The prompt to feed to the model.
-     * @return The modified script.
-     */
-    suspend fun modifyCodeGenerationLLMScript(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String, prompt: String): String
-
-    /**
      * Modifies the script based on a list of modifications.
      *
      * @param oldScript The old script.
