@@ -94,7 +94,7 @@ class ModificationDetectionService(
 
         val response = llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
 
-        return Json.decodeFromString<String>(response).cleanUpdateScriptResponseJson()
+        return Json.decodeFromString<String>(response)
     }
 
     override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
