@@ -1,6 +1,7 @@
 package modification_detection
 
 import classes.data.Element
+import classes.llm.LLM
 import classes.llm.Message
 import classes.service_model.CssSelector
 import classes.service_model.Modification
@@ -9,6 +10,7 @@ import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
+import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
@@ -22,12 +24,12 @@ import kotlinx.serialization.encodeToString
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
     private val getModificationModel: String,
-    private val getModificationSystemPrompt: String,
+    private val getModificationMessageHistory: List<Message>,
 ) : IModificationDetectionService {
     override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
-                previousElement.cssSelector == newElement.cssSelector
+                previousElement.cssSelector == newElement.cssSelector && previousElement.id == newElement.id && previousElement.label == newElement.label
             }
         }
     }
@@ -38,15 +40,18 @@ class ModificationDetectionService(
         val modificationRequest = ModificationRequest(modifiedElementJson, newElementsJson)
         val modificationRequestJson = Json.encodeToString(ModificationRequest.serializer(), modificationRequest)
 
-        val alternativeRequest = OllamaGenerateRequest(
+        val alternativeRequest = OllamaChatRequest(
             model = getModificationModel,
-            system = getModificationSystemPrompt,
-            prompt = modificationRequestJson,
+            messages = FEW_SHOT_GET_MODIFICATION_PROMPT + Message(
+                role = "user",
+                content = modificationRequestJson
+            ),
             stream = false,
             raw = false
         )
 
-        val alternativeResponseJson = llmClient.generate(alternativeRequest).response
+        val uncleanedAlternativeResponse = llmClient.chat(alternativeRequest).message.content
+        val alternativeResponseJson = uncleanedAlternativeResponse.extractAlternative()
         val alternativeElement = Json.decodeFromString<Element>(alternativeResponseJson)
 
         return Modification(modifiedElement, alternativeElement)
@@ -127,5 +132,12 @@ class ModificationDetectionService(
 
     private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
         return modifications.map { m -> CssSelector(m.old.cssSelector, m.new.cssSelector) }
+    }
+
+    private fun String.extractAlternative(): String {
+        val regex = Regex("""<BEGIN_ALTERNATIVE>\s*(.*?)\s*<END_ALTERNATIVE>""", RegexOption.DOT_MATCHES_ALL)
+        val matchResult = regex.find(this)
+        return matchResult?.groups?.get(1)?.value
+            ?: throw IllegalArgumentException("No alternative found in the response")
     }
 }

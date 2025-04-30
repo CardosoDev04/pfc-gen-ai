@@ -242,8 +242,8 @@ fun main() {
 
     val mds = ModificationDetectionService(
         llmClient = llmCli,
-        getModificationModel = LLM.Mistral7B.modelName,
-        getModificationSystemPrompt = GET_MODIFICATION_PROMPT
+        getModificationModel = LLM.Gemma3_4B.modelName,
+        getModificationMessageHistory = FEW_SHOT_GET_MODIFICATION_PROMPT
     )
 
     val snapshotServ = SnapshotService()

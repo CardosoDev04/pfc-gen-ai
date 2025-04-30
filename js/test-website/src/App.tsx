@@ -36,7 +36,7 @@ function App() {
                                 key={index}
                                 className="flex justify-between p-2 result space-x-10 bg-gray-200 w-1/6 rounded-md"
                             >
-                                <h1 id="item-title">{item}</h1>
+                                <h1 id="item-titulo">{item}</h1>
                                 <button
                                     className="book-btn p-2 bg-blue-500 hover:bg-blue-600 text-white hover:cursor-pointer"
                                     id={`book-${item.trim().toLowerCase()}-btn`}
