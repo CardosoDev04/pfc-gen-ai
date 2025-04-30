@@ -213,7 +213,7 @@ class Orchestrator(
         return summary.totalFailureCount.toInt() == 0
     }
 
-    suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
+    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
         val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
         val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
         val latestSnapshotHtml = latestSnapshot.html.readText()
@@ -221,7 +221,6 @@ class Orchestrator(
 
         val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
         val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
-
         val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
 
         return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
@@ -229,7 +228,7 @@ class Orchestrator(
 
     companion object {
         var prompt = FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-        val modelName = LLM.Llama8B.modelName
+        val modelName = LLM.Mistral7B.modelName
     }
 }
 
