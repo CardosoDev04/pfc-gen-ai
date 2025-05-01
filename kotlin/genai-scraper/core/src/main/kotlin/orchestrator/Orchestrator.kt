@@ -23,6 +23,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
 import org.junit.platform.launcher.core.LauncherFactory
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener
 import org.junit.platform.launcher.listeners.TestExecutionSummary
+import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.ElementNotInteractableException
 import org.openqa.selenium.StaleElementReferenceException
 import org.openqa.selenium.TimeoutException
@@ -34,7 +35,7 @@ import snapshots.ISnapshotService
 import snapshots.SnapshotService
 import java.io.File
 import java.net.URLClassLoader
-import java.util.*
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 fun findLastCreatedDirectory(directoryPath: String): File? {
@@ -157,9 +158,10 @@ class Orchestrator(
      *
      * @param scraper The scraper instance to run.
      */
-    override suspend fun runScraper(scraper: IScraperData, snapshotsPath: String) {
+    override suspend fun runScraper(scraper: IScraperData, snapshotsPath: String) : Boolean {
         try {
             scraper.compiledClass.scrape()
+            return true
         } catch (e: Exception) {
 
             val lastCreated = findLastCreatedDirectory(snapshotsPath)
@@ -183,7 +185,7 @@ class Orchestrator(
                         println("Scraper correction failed.")
                     }
 
-                    return
+                    return wasSuccessful
                 }
             }
 
@@ -264,6 +266,15 @@ fun main() {
     val demoScraperBundle = DemoScraperDataBundle(Configurations.scrapersBaseDir + "DemoScraper.kt", demoScraper)
 
    runBlocking {
-       orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
+       var succeeded = false
+       var count = 1
+       while(!succeeded){
+           succeeded = orchestrator.runScraper(demoScraperBundle, Configurations.snapshotBaseDir + "DemoScraper/latest")
+           if (count == 5){
+               println("Max retries reached.")
+               return@runBlocking
+           }
+           count++
+       }
    }
 }
