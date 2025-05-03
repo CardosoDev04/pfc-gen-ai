@@ -15,7 +15,7 @@ object Configurations {
         dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots/"
     }
 
-    val tempBaseDir: String by lazy {
-        dotenv["TEMP_DIR"] ?: "$baseDir/temp"
+    val versioningBaseDir: String by lazy {
+        dotenv["TEMP_DIR"] ?: "$baseDir/versioning"
     }
 }
