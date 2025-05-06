@@ -24,6 +24,7 @@ class GenericScraper internal constructor(
     suspend fun scrapeWithRetries(): Boolean {
         var attempts = 0
         var success = false
+
         while (!success && attempts < retries) {
             success = scrape()
             if (!success) {

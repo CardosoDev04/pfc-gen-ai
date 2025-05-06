@@ -35,7 +35,7 @@ class ScraperBuilder {
         return this
     }
 
-    fun build(driver: WebDriver, scraperFilePath: String, scraperTestClass: KClass<*>, scraperName: String): GenericScraper {
+    fun build(driver: WebDriver, scraperFilePath: String, scraperTestClass: KClass<*>): GenericScraper {
         val orchestrator = Orchestrator(
             modificationDetectionService = ModificationDetectionService(
                 llmClient = llmCli,
@@ -56,7 +56,7 @@ class ScraperBuilder {
             scraperInstance = compiled.scraper,
             classLoader = compiled.classLoader,
             orchestrator = orchestrator,
-            scraperName = scraperName,
+            scraperName = scraperFilePath.split("/").last().substringBeforeLast("."),
             scraperPath = scraperFilePath,
             retries = retries,
         )

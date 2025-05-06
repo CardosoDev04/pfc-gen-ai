@@ -14,17 +14,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import library.wrappers.GenericScraper
 import modification_detection.IModificationDetectionService
-import org.junit.platform.engine.discovery.DiscoverySelectors
-import org.junit.platform.launcher.LauncherDiscoveryRequest
-import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder
-import org.junit.platform.launcher.core.LauncherFactory
-import org.junit.platform.launcher.listeners.SummaryGeneratingListener
-import org.junit.platform.launcher.listeners.TestExecutionSummary
 import org.openqa.selenium.*
 import org.openqa.selenium.NoSuchElementException
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
+import java.lang.reflect.Method
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -126,16 +121,11 @@ class Orchestrator(
         // Sets inner references for the wrapper object as the new scraper
         wrapper.setScraperInstance(newScraperResult.scraper, newScraperResult.classLoader)
 
-
-        try {
-            val success = testScraper(wrapper.getScraperInstance())
-            if (!success) {
-                // Revert changes
-                wrapper.setScraperInstance(oldInstance, oldClassLoader)
-                throw IllegalStateException("Scraper tests failed.")
-            }
-        } catch (e: Exception) {
-            println("${e.message}")
+        val success = testScraper(wrapper.getScraperInstance())
+        if (!success) {
+            // Revert changes
+            wrapper.setScraperInstance(oldInstance, oldClassLoader)
+            println("Scraper tests failed.")
             return false
         }
 
@@ -193,8 +183,11 @@ class Orchestrator(
                 }
                 val clazz = newClassLoader.loadClass("scrapers.$className")
 
-                return@withContext CompiledScraperResult(clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
-                    .newInstance(driver, snapshotService) as IScraper, newClassLoader)
+                return@withContext CompiledScraperResult(
+                    clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
+                        .newInstance(driver, snapshotService) as IScraper,
+                    newClassLoader
+                )
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -252,34 +245,47 @@ class Orchestrator(
     override suspend fun testScraper(scraper: IScraper): Boolean {
         println("Testing scraper...")
 
-        // Ensure the test class is of the expected type
-        val testInstance = scraperTestKlass.objectInstance ?: scraperTestKlass.java.getDeclaredConstructor().newInstance()
+        val testInstance = scraperTestKlass
+            .java
+            .getDeclaredConstructor(IScraper::class.java)
+            .newInstance(scraper)
 
-        // Use reflection to find and call the setScraper method
-        val setScraperMethod = scraperTestKlass.java.methods.find { it.name == "setScraper" }
-        setScraperMethod?.invoke(testInstance, scraper)
+        getSetUpMethods(scraperTestKlass)
+            .forEach { it.invoke(testInstance) }
 
-        val summaryGeneratingListener = SummaryGeneratingListener()
-
-        val request: LauncherDiscoveryRequest = LauncherDiscoveryRequestBuilder.request()
-            .selectors(DiscoverySelectors.selectClass(scraperTestKlass.java))
-            .build()
-
-        val launcher = LauncherFactory.create()
-        launcher.registerTestExecutionListeners(summaryGeneratingListener)
-        launcher.execute(request)
-
-        val summary: TestExecutionSummary = summaryGeneratingListener.summary
-
-        println("Total tests discovered: ${summary.testsFoundCount}")
-
-        summary.failures.forEach { failure ->
-            println("Test failed: ${failure.testIdentifier.displayName}")
-            failure.exception.printStackTrace()
+        // Run all tests from the test class
+        val testMethods = scraperTestKlass.java.methods.filter {
+            it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
         }
 
-        return summary.totalFailureCount.toInt() == 0
+        var failedTests = 0
+
+        for (method in testMethods) {
+            try {
+                println("Running test: ${method.name}")
+                method.invoke(testInstance)
+            } catch (e: Exception) {
+                failedTests++
+                println("Test failed: ${method.name}")
+                println(e.cause?.message?.substringBefore("Build info:"))
+            }
+        }
+
+        getTearDownMethods(scraperTestKlass)
+            .forEach { it.invoke(testInstance) }
+
+        return failedTests == 0
     }
+
+    private fun getTearDownMethods(clazz: KClass<*>): List<Method> =
+        clazz.java.methods.filter {
+            it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java)
+        }
+
+    private fun getSetUpMethods(clazz: KClass<*>): List<Method> =
+        clazz.java.methods.filter {
+            it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java)
+        }
 
     private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
         val latestSnapshot =

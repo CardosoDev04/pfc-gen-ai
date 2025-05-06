@@ -14,9 +14,8 @@ fun main() {
         .withRetries(3)
         .build(
             driver,
-            "/Users/joaocardoso/Documents/Faculdade/PFC/pfc-gen-ai/kotlin/genai-scraper/scrapers/src/main/kotlin/scrapers/DemoScraper.kt",
-            testClass,
-            "DemoScraper"
+            Configurations.scrapersBaseDir + "DemoScraper.kt",
+            testClass
         )
 
     runBlocking {

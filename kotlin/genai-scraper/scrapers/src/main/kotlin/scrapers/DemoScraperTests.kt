@@ -1,39 +1,18 @@
 package scrapers
 
+import com.cardoso.common.buildChromeDriver
 import interfaces.IScraper
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.openqa.selenium.WebDriver
-import org.openqa.selenium.chrome.ChromeDriver
-import org.openqa.selenium.chrome.ChromeOptions
 import snapshots.ISnapshotService
 import snapshots.SnapshotService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class DemoScraperTest {
+class DemoScraperTest(val scraper: IScraper) {
 
-    private lateinit var driver: WebDriver
-    private lateinit var scraper: IScraper
-    private lateinit var snapshotService: ISnapshotService
-
-    @BeforeAll
-    fun setUp() {
-        // Setup headless Chrome
-        val options = ChromeOptions().apply {
-            addArguments("--headless=new", "--disable-gpu", "--no-sandbox")
-        }
-        driver = ChromeDriver(options)
-
-        // Real or stub snapshot service
-        snapshotService = SnapshotService()
-    }
-
-    /**
-     * Method to inject the scraper instance for testing.
-     */
-    fun setScraper(scraper: IScraper) {
-        this.scraper = scraper
-    }
+    private val driver: WebDriver = buildChromeDriver()
+    private val snapshotService: ISnapshotService = SnapshotService()
 
     @Test
     fun `scrape should return list of BookingOption from real page`() {
