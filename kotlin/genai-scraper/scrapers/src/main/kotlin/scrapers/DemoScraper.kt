@@ -1,7 +1,10 @@
 package scrapers
 
+import Configurations
 import classes.data.BookingOption
+import classes.scrapers.DemoScraperDataBundle
 import interfaces.IScraper
+import interfaces.IScraperData
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
@@ -31,4 +34,9 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             throw e
         }
     }
+
+    override fun getScraperData(): IScraperData = DemoScraperDataBundle(
+        path = Configurations.scrapersBaseDir + this::class.simpleName + ".kt",
+        compiledClass = this
+    )
 }

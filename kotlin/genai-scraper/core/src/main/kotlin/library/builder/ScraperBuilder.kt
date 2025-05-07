@@ -1,64 +1,77 @@
 package library.builder
 
 import classes.llm.LLM
-import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
-import kotlinx.coroutines.runBlocking
-import modification_detection.ModificationDetectionService
-import okhttp3.OkHttpClient
-import ollama.OllamaClient
-import org.openqa.selenium.WebDriver
-import persistence.implementations.FilePersistenceService
-import snapshots.SnapshotService
+import compiler.ScraperCompiler
 import html_fetcher.WebExtractor
-import library.wrappers.GenericScraper
-import orchestrator.Orchestrator
-import java.util.concurrent.TimeUnit
-import kotlin.reflect.KClass
+import modification_detection.IModificationDetectionService
+import org.openqa.selenium.WebDriver
+import persistence.PersistenceService
+import snapshots.ISnapshotService
+import wrapper.Scraper
 
 class ScraperBuilder {
+
+    private var modificationDetectionService: IModificationDetectionService? = null
+    private var snapshotService: ISnapshotService? = null
+    private var webExtractor: WebExtractor? = null
+    private var persistenceService: PersistenceService? = null
+    private var driver: WebDriver? = null
+    private var scraperTestClassName: String? = null
     private var retries: Int = 3
-    private var model: String = LLM.Mistral7B.modelName
-    private val httpCli = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
-    private val llmCli = OllamaClient(httpCli)
+    private var model: LLM = LLM.Mistral7B
 
-    fun withRetries(retries: Int): ScraperBuilder {
+    fun withModificationDetectionService(service: IModificationDetectionService) = apply {
+        this.modificationDetectionService = service
+    }
+
+    fun withSnapshotService(service: ISnapshotService) = apply {
+        this.snapshotService = service
+    }
+
+    fun withWebExtractor(extractor: WebExtractor) = apply {
+        this.webExtractor = extractor
+    }
+
+    fun withPersistenceService(service: PersistenceService) = apply {
+        this.persistenceService = service
+    }
+
+    fun withWebDriver(driver: WebDriver) = apply {
+        this.driver = driver
+    }
+
+    fun withScraperTestClassName(className: String) = apply {
+        this.scraperTestClassName = className
+    }
+
+    fun withRetries(retries: Int) = apply {
         this.retries = retries
-        return this
     }
 
-    fun withModel(model: String): ScraperBuilder {
+    fun withModel(model: LLM) = apply {
         this.model = model
-        return this
     }
 
-    fun build(driver: WebDriver, scraperFilePath: String, scraperTestClass: KClass<*>): GenericScraper {
-        val orchestrator = Orchestrator(
-            modificationDetectionService = ModificationDetectionService(
-                llmClient = llmCli,
-                getModificationModel = model,
-                getModificationMessageHistory = FEW_SHOT_GET_MODIFICATION_PROMPT
-            ),
-            snapshotService = SnapshotService(),
-            webExtractor = WebExtractor(),
-            persistenceService = FilePersistenceService(),
+    suspend fun build(driver: WebDriver, scraperPath: String): Scraper {
+
+        val compiled = ScraperCompiler.attemptToCompileAndInstantiate(
             driver = driver,
-            scraperTestKlass = scraperTestClass
-        )
+            snapshotService = snapshotService ?: error("snapshotService not set"),
+            scraperCodePath = scraperPath
+        ) ?: error("Initial scraper compilation failed.")
 
-        val compiled = runBlocking { orchestrator.attemptToCompileAndInstantiateNewScraper(scraperFilePath) }
-            ?: throw IllegalStateException("Failed to compile and instantiate the scraper")
-
-        return GenericScraper(
-            scraperInstance = compiled.scraper,
-            classLoader = compiled.classLoader,
-            orchestrator = orchestrator,
-            scraperName = scraperFilePath.split("/").last().substringBeforeLast("."),
-            scraperPath = scraperFilePath,
+        return Scraper(
+            modificationDetectionService = modificationDetectionService ?: error("modificationDetectionService not set"),
+            snapshotService = snapshotService!!,
+            webExtractor = webExtractor ?: error("webExtractor not set"),
+            persistenceService = persistenceService ?: error("persistenceService not set"),
+            driver = driver,
+            scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
+            backupScraper = null,
+            currentScraper = compiled,
             retries = retries,
+            model = model
         )
     }
+
 }
