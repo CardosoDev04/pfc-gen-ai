@@ -1,6 +1,5 @@
 package scrapers
 
-import Configurations
 import classes.data.BookingOption
 import interfaces.IScraper
 import org.openqa.selenium.By
@@ -18,21 +17,17 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step1")
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-btn"))).click()
 
-            val optionElements =
-                webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
+            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
 
-            snapshotService.takeSnapshotAsFile(
-                driver,
-                Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step2"
-            )
+            snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step2")
 
             val results = optionElements.map { BookingOption(it.text) }
 
             return results
         } catch (e: Exception) {
-            snapshotService.takeSnapshotAsFile(driver, "$${Configurations.snapshotBaseDir}working/snapshots/${this::class.simpleName}/latest")
+            snapshotService.takeSnapshotAsFile(driver, "kotlin/working/snapshots/${this::class.simpleName}/latest")
             throw e
         }
     }

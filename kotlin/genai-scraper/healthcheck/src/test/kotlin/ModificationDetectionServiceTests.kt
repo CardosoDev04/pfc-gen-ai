@@ -1,5 +1,5 @@
 import classes.llm.LLM
-import domain.prompts.GET_MODIFICATION_PROMPT
+import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
 import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import modification_detection.ModificationDetectionService
@@ -311,7 +311,7 @@ class ModificationDetectionServiceTests {
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .build()
         private val ollamaClient = OllamaClient(httpClient)
-            private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, GET_MODIFICATION_PROMPT)
+            private val mds = ModificationDetectionService(ollamaClient, LLM.Mistral7B.modelName, FEW_SHOT_GET_MODIFICATION_PROMPT)
 
         val webExtractor = WebExtractor()
     }

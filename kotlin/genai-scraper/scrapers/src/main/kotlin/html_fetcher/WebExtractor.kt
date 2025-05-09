@@ -76,7 +76,9 @@ class WebExtractor {
             Element(
                 type = element.tagName(),
                 cssSelector = element.cssSelector(),
-                text = element.ownText().trim()
+                text = element.ownText().trim(),
+                id = element.id() ?: "",
+                label = element.attr("label").trim()
             )
         }
     }
