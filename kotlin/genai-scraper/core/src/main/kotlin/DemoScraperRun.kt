@@ -8,13 +8,15 @@ import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
 import ollama.OllamaClient
 import persistence.implementations.FilePersistenceService
+import scrapers.DemoScraper
+import scrapers.DemoScraperTest
 import snapshots.SnapshotService
 import java.util.concurrent.TimeUnit
 
 fun main() {
     runBlocking {
-        val driver = buildChromeDriver()
         val snapshotService = SnapshotService()
+        val driver = buildChromeDriver()
         val persistenceService = FilePersistenceService()
         val webExtractor = WebExtractor()
         val httpClient = OkHttpClient.Builder()
@@ -25,28 +27,23 @@ fun main() {
         val llmClient = OllamaClient(httpClient)
         val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName, FEW_SHOT_GET_MODIFICATION_PROMPT)
 
-
+        val initialScraper = DemoScraper(driver, snapshotService)
         val scraper = ScraperBuilder()
             .withModel(LLM.CodeLlama7B)
             .withRetries(3)
             .withSnapshotService(snapshotService)
-            .withWebDriver(driver)
             .withPersistenceService(persistenceService)
             .withWebExtractor(webExtractor)
-            .withScraperTestClassName("scrapers.DemoScraperTest")
+            .withScraperTestClassName(DemoScraperTest::class)
             .withModificationDetectionService(modificationDetectionService)
-            .build(
-                driver,
-                scraperPath = Configurations.scrapersBaseDir + "DemoScraper.kt"
-            )
+            .withDriver(driver)
+            .build(initialScraper)
 
         try {
             scraper.scrape()
         } catch (e: Exception) {
             println("Error during scraping: ${e.message}")
             e.printStackTrace()
-        } finally {
-            scraper.close()
         }
     }
 }

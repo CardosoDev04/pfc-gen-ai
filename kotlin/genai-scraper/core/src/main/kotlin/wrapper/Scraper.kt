@@ -5,20 +5,20 @@ import classes.data.Element
 import classes.llm.LLM
 import classes.service_model.Modification
 import compiler.ScraperCompiler
-import domain.model.classes.data.CompiledScraperResult
 import domain.model.interfaces.IScraperWrapper
 import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
 import html_fetcher.WebExtractor
+import interfaces.IScraper
 import interfaces.IScraperData
 import modification_detection.IModificationDetectionService
-import okio.Closeable
-import org.openqa.selenium.*
+import org.openqa.selenium.ElementNotInteractableException
 import org.openqa.selenium.NoSuchElementException
+import org.openqa.selenium.StaleElementReferenceException
+import org.openqa.selenium.TimeoutException
+import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
-import java.lang.management.ClassLoadingMXBean
-import java.lang.management.ManagementFactory
 import java.lang.reflect.Method
 import kotlin.reflect.KClass
 
@@ -37,24 +37,12 @@ class Scraper(
     private val webExtractor: WebExtractor,
     private val persistenceService: PersistenceService,
     private val driver: WebDriver,
-    private val scraperTestClassName: String,
-    private var backupScraper: CompiledScraperResult?,
-    private var currentScraper: CompiledScraperResult?,
+    private val scraperTestClazz: KClass<*>,
+    private var backupScraper: IScraper?,
+    private var currentScraper: IScraper,
     private val retries: Int,
     private val model: LLM
-) : IScraperWrapper, Closeable {
-
-    private fun closeBackup() {
-        backupScraper?.classLoader?.close()
-        backupScraper = null
-        System.gc()
-    }
-
-    private fun closeCurrent() {
-        currentScraper?.classLoader?.close()
-        currentScraper = null
-        System.gc()
-    }
+) : IScraperWrapper {
 
     private suspend fun correctScraper(
         oldScraper: IScraperData,
@@ -103,13 +91,6 @@ class Scraper(
         // Overwrite scraper's source code
         persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
-        // First close the current classloader to avoid any leaks
-        closeCurrent()
-
-        // Make sure we wait for any lingering references to be cleaned up
-        System.gc()
-        Thread.sleep(100) // Small pause to allow GC to work
-
         val newScraperResult =
             ScraperCompiler.attemptToCompileAndInstantiate(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", driver, snapshotService)
 
@@ -126,19 +107,16 @@ class Scraper(
 
         backupScraper = currentScraper
 
-        val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null.")
+        val currentScraperValue = currentScraper
 
         val success = testScraper(currentScraperValue)
         if (!success) {
             // Revert currentScraper to the backup scraper
-            closeCurrent()
-            currentScraper = backupScraper
+            val backupScraperValue = backupScraper ?: throw IllegalStateException("Backup scraper is null.")
+            currentScraper = backupScraperValue
             println("Scraper tests failed.")
             return false
         }
-
-        // Close the backup CL and attempt to eliminate it from memory
-        closeBackup()
 
         // Save the current scraper as the new backup
         backupScraper = currentScraper
@@ -154,7 +132,7 @@ class Scraper(
      */
     private suspend fun runScraper(snapshotsPath: String): Boolean {
         try {
-            currentScraper?.scraper?.scrape()
+            currentScraper.scrape()
             return true
         } catch (e: Exception) {
 
@@ -172,9 +150,9 @@ class Scraper(
             for (exception in exceptionsToCheck) {
                 if (exception.isInstance(e)) {
                     println("Caught exception: ${e::class.simpleName}")
-                    val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
-                    val modifications = getModifications(currentScraperValue.scraper.getScraperData(), stepName)
-                    val wasSuccessful = correctScraper(currentScraperValue.scraper.getScraperData(), modifications)
+                    val currentScraperValue = currentScraper
+                    val modifications = getModifications(currentScraperValue.getScraperData(), stepName)
+                    val wasSuccessful = correctScraper(currentScraperValue.getScraperData(), modifications)
 
                     if (!wasSuccessful) {
                         println("Scraper correction failed.")
@@ -193,42 +171,21 @@ class Scraper(
      * This updated method takes the CompiledScraperResult directly rather than just the IScraper instance
      * to ensure we're using the correct classloader for both the test class and scraper.
      *
-     * @param compiledResult The compiled scraper result containing both the scraper and its classloader
+     * @param compiledScraper The compiled scraper result containing both the scraper and its classloader
      */
-    private fun testScraper(compiledResult: CompiledScraperResult): Boolean {
-        println("Testing scraper with proper classloader...")
+    private fun testScraper(compiledScraper: IScraper): Boolean {
+        println("Testing scraper...")
 
-        // Use the same classloader for both test class and scraper interface
-        val classLoader = compiledResult.classLoader
-        val scraper = compiledResult.scraper
+        val testInstance = scraperTestClazz
+            .java
+            .getDeclaredConstructor(IScraper::class.java)
+            .newInstance(compiledScraper)
 
-        // Load test class from the same classloader as the scraper
-        val testClass = requireNotNull(classLoader.loadClass(scraperTestClassName)) {
-            "Failed to load test class $scraperTestClassName"
-        }
+        getSetUpMethods(scraperTestClazz)
+            .forEach { it.invoke(testInstance) }
 
-        // Load IScraper interface from the same classloader
-        val scraperInterface = requireNotNull(classLoader.loadClass("interfaces.IScraper")) {
-            "Failed to load IScraper interface from same classloader"
-        }
-
-        // Verify that the scraper is indeed an instance of the correct IScraper interface
-        if (!scraperInterface.isInstance(scraper)) {
-            println("WARNING: Scraper is not an instance of the expected IScraper interface!")
-            println("Scraper class: ${scraper.javaClass.name}")
-            println("Expected interface: ${scraperInterface.name}")
-            println("Scraper's classloader: ${scraper.javaClass.classLoader}")
-            println("Interface's classloader: ${scraperInterface.classLoader}")
-            return false
-        }
-
-        // Create the test instance with the correct scraper
-        val testInstance = testClass.getDeclaredConstructor(scraperInterface).newInstance(scraper)
-
-        // Run setup methods
-        getSetUpMethods(testClass).forEach { it.invoke(testInstance) }
-
-        val testMethods = testClass.methods.filter {
+        // Run all tests from the test class
+        val testMethods = scraperTestClazz.java.methods.filter {
             it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
         }
 
@@ -245,18 +202,21 @@ class Scraper(
             }
         }
 
-        getTearDownMethods(testClass)
+        getTearDownMethods(scraperTestClazz)
             .forEach { it.invoke(testInstance) }
 
         return failedTests == 0
     }
 
-    private fun getSetUpMethods(clazz: Class<*>): List<Method> =
-        clazz.methods.filter { it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java) }
+    private fun getTearDownMethods(clazz: KClass<*>): List<Method> =
+        clazz.java.methods.filter {
+            it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java)
+        }
 
-    private fun getTearDownMethods(clazz: Class<*>): List<Method> =
-        clazz.methods.filter { it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java) }
-
+    private fun getSetUpMethods(clazz: KClass<*>): List<Method> =
+        clazz.java.methods.filter {
+            it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java)
+        }
 
     private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
         val latestSnapshot =
@@ -273,19 +233,12 @@ class Scraper(
         return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
     }
 
-    override fun close() {
-        closeCurrent()
-        closeBackup()
-        System.gc()
-    }
-
     override suspend fun scrape(): Boolean {
         var attempts = 0
         var success = false
 
         while (!success && attempts < retries) {
-            val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
-            success = runScraper(Configurations.snapshotBaseDir + currentScraperValue.scraper::class.simpleName + "/latest")
+            success = runScraper(Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest")
             if (!success) {
                 println("Retry #${attempts + 1} failed.")
             }
@@ -297,27 +250,5 @@ class Scraper(
         }
 
         return success
-    }
-
-    private fun logMemoryAndClassloaderInfo(label: String) {
-        val runtime = Runtime.getRuntime()
-        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-        val totalMemory = runtime.totalMemory() / (1024 * 1024)
-
-        println("======= $label =======")
-        println("Memory usage: $usedMemory MB / $totalMemory MB")
-        println("Current classloader: ${this.javaClass.classLoader}")
-        println("Current scraper classloader: ${currentScraper?.scraper?.javaClass?.classLoader}")
-        println("Backup scraper classloader: ${backupScraper?.scraper?.javaClass?.classLoader}")
-
-        // List loaded classes (for debugging severe issues)
-        val beans = ManagementFactory.getPlatformMBeanServer()
-        val mbean = ManagementFactory.newPlatformMXBeanProxy(
-            beans, "com.sun.management:type=ClassLoading",
-            ClassLoadingMXBean::class.java
-        )
-
-        println("Total loaded classes: ${mbean.loadedClassCount}")
-        println("===========================")
     }
 }

@@ -3,11 +3,13 @@ package library.builder
 import classes.llm.LLM
 import compiler.ScraperCompiler
 import html_fetcher.WebExtractor
+import interfaces.IScraper
 import modification_detection.IModificationDetectionService
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import wrapper.Scraper
+import kotlin.reflect.KClass
 
 class ScraperBuilder {
 
@@ -15,10 +17,10 @@ class ScraperBuilder {
     private var snapshotService: ISnapshotService? = null
     private var webExtractor: WebExtractor? = null
     private var persistenceService: PersistenceService? = null
-    private var driver: WebDriver? = null
-    private var scraperTestClassName: String? = null
+    private var scraperTestClazz: KClass<*>? = null
     private var retries: Int = 3
     private var model: LLM = LLM.Mistral7B
+    private var driver: WebDriver? = null
 
     fun withModificationDetectionService(service: IModificationDetectionService) = apply {
         this.modificationDetectionService = service
@@ -36,12 +38,8 @@ class ScraperBuilder {
         this.persistenceService = service
     }
 
-    fun withWebDriver(driver: WebDriver) = apply {
-        this.driver = driver
-    }
-
-    fun withScraperTestClassName(className: String) = apply {
-        this.scraperTestClassName = className
+    fun withScraperTestClassName(clazz: KClass<*>) = apply {
+        this.scraperTestClazz = clazz
     }
 
     fun withRetries(retries: Int) = apply {
@@ -52,25 +50,23 @@ class ScraperBuilder {
         this.model = model
     }
 
-    suspend fun build(driver: WebDriver, scraperPath: String): Scraper {
+    fun withDriver(driver: WebDriver) = apply {
+        this.driver = driver
+    }
 
-        val compiled = ScraperCompiler.attemptToCompileAndInstantiate(
-            driver = driver,
-            snapshotService = snapshotService ?: error("snapshotService not set"),
-            scraperCodePath = scraperPath
-        ) ?: error("Initial scraper compilation failed.")
+    fun build(initialScraper: IScraper): Scraper {
 
         return Scraper(
             modificationDetectionService = modificationDetectionService ?: error("modificationDetectionService not set"),
             snapshotService = snapshotService!!,
             webExtractor = webExtractor ?: error("webExtractor not set"),
             persistenceService = persistenceService ?: error("persistenceService not set"),
-            driver = driver,
-            scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
             backupScraper = null,
-            currentScraper = compiled,
+            scraperTestClazz = scraperTestClazz ?: error("scraperTestClazz not set"),
+            currentScraper = initialScraper,
             retries = retries,
-            model = model
+            model = model,
+            driver = driver ?: error("driver not set")
         )
     }
 

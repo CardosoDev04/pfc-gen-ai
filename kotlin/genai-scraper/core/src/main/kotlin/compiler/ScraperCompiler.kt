@@ -1,72 +1,61 @@
 package compiler
 
 import Configurations
-import domain.model.classes.data.CompiledScraperResult
 import interfaces.IScraper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.jetbrains.kotlin.cli.common.CLICompiler
 import org.openqa.selenium.WebDriver
 import snapshots.ISnapshotService
 import java.io.File
 import java.net.URLClassLoader
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.util.*
+import java.time.LocalDateTime
 
 object ScraperCompiler {
-    suspend fun attemptToCompileAndInstantiate(scraperCodePath: String, driver: WebDriver, snapshotService: ISnapshotService): CompiledScraperResult? =
-        withContext(Dispatchers.IO) {
-            try {
-                val originalFile = File(scraperCodePath)
+    fun attemptToCompileAndInstantiate(scraperCodePath: String, driver: WebDriver, snapshotService: ISnapshotService): IScraper? {
+        return try {
+            val scraperCode = File(scraperCodePath).readText()
 
-                // Clear the versioning folder
-                val versioningBaseDir = Paths.get(Configurations.versioningBaseDir)
-                if (Files.exists(versioningBaseDir)) {
-                    Files.walk(versioningBaseDir)
-                        .sorted(Comparator.reverseOrder())
-                        .map { it.toFile() }
-                        .forEach { it.delete() }
-                }
+            val srcDir = File(Configurations.versioningBaseDir + "/src/" + LocalDateTime.now().toString())
+            srcDir.mkdirs()
 
-                // Create a new versioning folder
-                val tempFolder = File("${Configurations.versioningBaseDir}/compiled_${System.currentTimeMillis()}")
-                tempFolder.mkdirs()
+            val newSrcFile = File(srcDir, scraperCodePath.substringAfterLast("/"))
+            newSrcFile.writeText(scraperCode)
 
-                // Copy the Kotlin file to the versioning folder
-                val tempKtFile = File(tempFolder, originalFile.name)
-                originalFile.copyTo(tempKtFile)
+            val compiledDir = File(Configurations.versioningBaseDir + "/out/" + LocalDateTime.now().toString())
+            compiledDir.mkdirs()
+            compileKotlin(srcDir, compiledDir)
 
-                // Compile to the versioning folder
-                val classpath = System.getProperty("java.class.path")
-                val process = ProcessBuilder("kotlinc", tempKtFile.path, "-d", tempFolder.path, "-classpath", classpath)
-                    .redirectErrorStream(true)
-                    .start()
+            val classLoader =
+                URLClassLoader(arrayOf(compiledDir.toURI().toURL()), Thread.currentThread().contextClassLoader)
+            val instance =
+                classLoader.loadClass("scrapers.${scraperCodePath.substringAfterLast("/").substringBeforeLast(".")}")
+                    .also { classLoader.close() }
+                    .getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
+                    .newInstance(driver, snapshotService) as IScraper
 
-                val compilerOutput = process.inputStream.bufferedReader().readText()
-                println("Compiler output:\n$compilerOutput")
-
-                val exitCode = process.waitFor()
-                if (exitCode != 0) {
-                    println("Compilation failed for ${tempKtFile.name}")
-                    return@withContext null
-                }
-
-                val newClassLoader =
-                    URLClassLoader.newInstance(arrayOf(tempFolder.toURI().toURL()), this::class.java.classLoader)
-                val className = tempKtFile.nameWithoutExtension.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                }
-                val clazz = newClassLoader.loadClass("scrapers.$className")
-
-                return@withContext CompiledScraperResult(
-                    clazz.getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
-                        .newInstance(driver, snapshotService) as IScraper,
-                    newClassLoader
-                )
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                return@withContext null
-            }
+            instance
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
+    }
+
+    private fun compileKotlin(sourceDir: File, outputDir: File): Boolean {
+        val args = mutableListOf<String>().apply {
+            add("-d")
+            add(outputDir.absolutePath)
+            add("-classpath")
+            add(System.getProperty("java.class.path"))
+            add("-no-stdlib")
+            add("-no-reflect")
+            addAll(
+                sourceDir.walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .map { it.absolutePath }
+            )
+        }
+
+        return CLICompiler.doMainNoExit(K2JVMCompiler(), args.toTypedArray()) == ExitCode.OK
+    }
 }
