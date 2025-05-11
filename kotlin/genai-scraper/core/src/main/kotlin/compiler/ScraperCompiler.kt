@@ -18,38 +18,35 @@ data class CompiledScraperResult(
 
 object ScraperCompiler {
     fun attemptToCompileAndInstantiate(
-        scraperCodePath: String,
+        scraperName: String,
+        newScraperCode: String,
         driver: WebDriver,
         snapshotService: ISnapshotService,
         testClassName: String
     ): CompiledScraperResult? {
         return try {
-            val scraperCode = File(scraperCodePath).readText()
-
-            val srcDir = File(Configurations.versioningBaseDir + "/src/" + LocalDateTime.now().toString())
+            val srcDir = File(Configurations.versioningBaseDir + "src/${scraperName}_${LocalDateTime.now()}")
             srcDir.mkdirs()
 
-            val newSrcFile = File(srcDir, scraperCodePath.substringAfterLast("/"))
-            newSrcFile.writeText(scraperCode)
+            val newSrcFile = File(srcDir, scraperName)
+            newSrcFile.writeText(newScraperCode)
 
-            val compiledDir = File(Configurations.versioningBaseDir + "/out/" + LocalDateTime.now().toString())
+            val compiledDir = File(Configurations.versioningBaseDir + "out/${scraperName}_${LocalDateTime.now()}")
             compiledDir.mkdirs()
             compileKotlin(srcDir, compiledDir)
 
-            val classLoader =
-                URLClassLoader(arrayOf(compiledDir.toURI().toURL()), Thread.currentThread().contextClassLoader)
+            val classLoader = URLClassLoader(arrayOf(compiledDir.toURI().toURL()))
 
-            val scraperClass = classLoader.loadClass("scrapers.${scraperCodePath.substringAfterLast("/").substringBeforeLast(".")}")
+            val scraperClass = classLoader.loadClass("scrapers.${scraperName}")
             val scraperInstance = scraperClass
                 .getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
                 .newInstance(driver, snapshotService) as IScraper
 
             val testClass = classLoader.loadClass("scrapers.$testClassName")
             val testInstance = testClass
+                .also { classLoader.close() }
                 .getDeclaredConstructor(IScraper::class.java)
                 .newInstance(scraperInstance)
-
-            classLoader.close()
 
             CompiledScraperResult(scraperInstance, testInstance)
         } catch (e: Exception) {

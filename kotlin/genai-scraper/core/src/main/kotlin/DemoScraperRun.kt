@@ -27,6 +27,7 @@ fun main() {
         val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName, FEW_SHOT_GET_MODIFICATION_PROMPT)
 
         val initialScraper = DemoScraper(driver, snapshotService)
+
         val scraper = ScraperBuilder()
             .withModel(LLM.CodeLlama7B)
             .withRetries(3)

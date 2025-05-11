@@ -88,11 +88,7 @@ class Scraper(
             else -> throw Exception("Unrecognized model name.")
         }
 
-        // Overwrite scraper's source code
-        persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
-
-        val newScraperResult = ScraperCompiler.attemptToCompileAndInstantiate(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", driver, snapshotService, scraperTestClassName)
-
+        val newScraperResult = ScraperCompiler.attemptToCompileAndInstantiate(oldScraper.name, newScript, driver, snapshotService, scraperTestClassName)
 
         if (newScraperResult == null) {
             println("Compilation of the new scraper failed")
@@ -102,12 +98,13 @@ class Scraper(
             return false
         }
 
+        backupScraper = currentScraper
+
         // currentScraper is now the newly compiled one
         currentScraper = newScraperResult.scraperInstance
 
-        backupScraper = currentScraper
-
         val success = testScraper(newScraperResult.testInstance)
+
         if (!success) {
             // Revert currentScraper to the backup scraper
             val backupScraperValue = backupScraper ?: throw IllegalStateException("Backup scraper is null.")
@@ -120,6 +117,10 @@ class Scraper(
         backupScraper = currentScraper
 
         println("Scraper tests were successful!")
+
+        // Overwrite scraper's source code
+        persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
+
         return true
     }
 
