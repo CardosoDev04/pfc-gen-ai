@@ -1,7 +1,6 @@
 package library.builder
 
 import classes.llm.LLM
-import compiler.ScraperCompiler
 import html_fetcher.WebExtractor
 import interfaces.IScraper
 import modification_detection.IModificationDetectionService
@@ -9,7 +8,6 @@ import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import wrapper.Scraper
-import kotlin.reflect.KClass
 
 class ScraperBuilder {
 
@@ -17,7 +15,7 @@ class ScraperBuilder {
     private var snapshotService: ISnapshotService? = null
     private var webExtractor: WebExtractor? = null
     private var persistenceService: PersistenceService? = null
-    private var scraperTestClazz: KClass<*>? = null
+    private var scraperTestClassName: String? = null
     private var retries: Int = 3
     private var model: LLM = LLM.Mistral7B
     private var driver: WebDriver? = null
@@ -38,8 +36,8 @@ class ScraperBuilder {
         this.persistenceService = service
     }
 
-    fun withScraperTestClassName(clazz: KClass<*>) = apply {
-        this.scraperTestClazz = clazz
+    fun withScraperTestClassName(name: String) = apply {
+        this.scraperTestClassName = name
     }
 
     fun withRetries(retries: Int) = apply {
@@ -62,7 +60,7 @@ class ScraperBuilder {
             webExtractor = webExtractor ?: error("webExtractor not set"),
             persistenceService = persistenceService ?: error("persistenceService not set"),
             backupScraper = null,
-            scraperTestClazz = scraperTestClazz ?: error("scraperTestClazz not set"),
+            scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
             currentScraper = initialScraper,
             retries = retries,
             model = model,

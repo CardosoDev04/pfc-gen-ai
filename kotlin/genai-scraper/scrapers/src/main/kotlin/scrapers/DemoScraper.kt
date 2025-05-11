@@ -20,7 +20,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step1")
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-btn"))).click()
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
 
             val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
 

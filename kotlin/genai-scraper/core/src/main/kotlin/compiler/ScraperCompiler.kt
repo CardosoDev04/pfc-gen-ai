@@ -11,8 +11,18 @@ import java.io.File
 import java.net.URLClassLoader
 import java.time.LocalDateTime
 
+data class CompiledScraperResult(
+    val scraperInstance: IScraper,
+    val testInstance: Any
+)
+
 object ScraperCompiler {
-    fun attemptToCompileAndInstantiate(scraperCodePath: String, driver: WebDriver, snapshotService: ISnapshotService): IScraper? {
+    fun attemptToCompileAndInstantiate(
+        scraperCodePath: String,
+        driver: WebDriver,
+        snapshotService: ISnapshotService,
+        testClassName: String
+    ): CompiledScraperResult? {
         return try {
             val scraperCode = File(scraperCodePath).readText()
 
@@ -28,13 +38,20 @@ object ScraperCompiler {
 
             val classLoader =
                 URLClassLoader(arrayOf(compiledDir.toURI().toURL()), Thread.currentThread().contextClassLoader)
-            val instance =
-                classLoader.loadClass("scrapers.${scraperCodePath.substringAfterLast("/").substringBeforeLast(".")}")
-                    .also { classLoader.close() }
-                    .getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
-                    .newInstance(driver, snapshotService) as IScraper
 
-            instance
+            val scraperClass = classLoader.loadClass("scrapers.${scraperCodePath.substringAfterLast("/").substringBeforeLast(".")}")
+            val scraperInstance = scraperClass
+                .getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
+                .newInstance(driver, snapshotService) as IScraper
+
+            val testClass = classLoader.loadClass("scrapers.$testClassName")
+            val testInstance = testClass
+                .getDeclaredConstructor(IScraper::class.java)
+                .newInstance(scraperInstance)
+
+            classLoader.close()
+
+            CompiledScraperResult(scraperInstance, testInstance)
         } catch (e: Exception) {
             e.printStackTrace()
             null

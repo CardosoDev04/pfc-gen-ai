@@ -9,7 +9,6 @@ import okhttp3.OkHttpClient
 import ollama.OllamaClient
 import persistence.implementations.FilePersistenceService
 import scrapers.DemoScraper
-import scrapers.DemoScraperTest
 import snapshots.SnapshotService
 import java.util.concurrent.TimeUnit
 
@@ -34,7 +33,7 @@ fun main() {
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
             .withWebExtractor(webExtractor)
-            .withScraperTestClassName(DemoScraperTest::class)
+            .withScraperTestClassName("DemoScraperTest")
             .withModificationDetectionService(modificationDetectionService)
             .withDriver(driver)
             .build(initialScraper)

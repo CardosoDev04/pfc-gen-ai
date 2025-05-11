@@ -37,7 +37,7 @@ class Scraper(
     private val webExtractor: WebExtractor,
     private val persistenceService: PersistenceService,
     private val driver: WebDriver,
-    private val scraperTestClazz: KClass<*>,
+    private val scraperTestClassName: String,
     private var backupScraper: IScraper?,
     private var currentScraper: IScraper,
     private val retries: Int,
@@ -91,8 +91,8 @@ class Scraper(
         // Overwrite scraper's source code
         persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
-        val newScraperResult =
-            ScraperCompiler.attemptToCompileAndInstantiate(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", driver, snapshotService)
+        val newScraperResult = ScraperCompiler.attemptToCompileAndInstantiate(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", driver, snapshotService, scraperTestClassName)
+
 
         if (newScraperResult == null) {
             println("Compilation of the new scraper failed")
@@ -103,13 +103,11 @@ class Scraper(
         }
 
         // currentScraper is now the newly compiled one
-        currentScraper = newScraperResult
+        currentScraper = newScraperResult.scraperInstance
 
         backupScraper = currentScraper
 
-        val currentScraperValue = currentScraper
-
-        val success = testScraper(currentScraperValue)
+        val success = testScraper(newScraperResult.testInstance)
         if (!success) {
             // Revert currentScraper to the backup scraper
             val backupScraperValue = backupScraper ?: throw IllegalStateException("Backup scraper is null.")
@@ -171,21 +169,16 @@ class Scraper(
      * This updated method takes the CompiledScraperResult directly rather than just the IScraper instance
      * to ensure we're using the correct classloader for both the test class and scraper.
      *
-     * @param compiledScraper The compiled scraper result containing both the scraper and its classloader
+     * @param testInstance The compiled scraper test instance
      */
-    private fun testScraper(compiledScraper: IScraper): Boolean {
+    private fun testScraper(testInstance: Any): Boolean {
         println("Testing scraper...")
 
-        val testInstance = scraperTestClazz
-            .java
-            .getDeclaredConstructor(IScraper::class.java)
-            .newInstance(compiledScraper)
-
-        getSetUpMethods(scraperTestClazz)
+        getSetUpMethods(testInstance::class)
             .forEach { it.invoke(testInstance) }
 
         // Run all tests from the test class
-        val testMethods = scraperTestClazz.java.methods.filter {
+        val testMethods = testInstance::class.java.methods.filter {
             it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
         }
 
@@ -202,7 +195,7 @@ class Scraper(
             }
         }
 
-        getTearDownMethods(scraperTestClazz)
+        getTearDownMethods(testInstance::class)
             .forEach { it.invoke(testInstance) }
 
         return failedTests == 0
