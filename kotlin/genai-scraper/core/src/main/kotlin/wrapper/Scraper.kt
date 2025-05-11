@@ -92,7 +92,7 @@ class Scraper(
 
         if (newScraperResult == null) {
             println("Compilation of the new scraper failed")
-            val oldScript = persistenceService.read(Configurations.versioningBaseDir + "${oldScraper.name}.kt")
+            val oldScript = persistenceService.read(Configurations.scrapersBaseDir + "${oldScraper.name}.kt")
             persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", oldScript)
 
             return false

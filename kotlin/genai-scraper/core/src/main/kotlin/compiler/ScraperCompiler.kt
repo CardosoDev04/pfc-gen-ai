@@ -2,9 +2,6 @@ package compiler
 
 import Configurations
 import interfaces.IScraper
-import org.jetbrains.kotlin.cli.common.ExitCode
-import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
-import org.jetbrains.kotlin.cli.common.CLICompiler
 import org.openqa.selenium.WebDriver
 import snapshots.ISnapshotService
 import java.io.File
@@ -28,12 +25,17 @@ object ScraperCompiler {
             val srcDir = File(Configurations.versioningBaseDir + "src/${scraperName}_${LocalDateTime.now()}")
             srcDir.mkdirs()
 
-            val newSrcFile = File(srcDir, scraperName)
+            val newSrcFile = File(srcDir, "$scraperName.kt")
             newSrcFile.writeText(newScraperCode)
 
             val compiledDir = File(Configurations.versioningBaseDir + "out/${scraperName}_${LocalDateTime.now()}")
             compiledDir.mkdirs()
-            compileKotlin(srcDir, compiledDir)
+            val isScraperCompileSuccess = compileKotlin(srcDir, compiledDir)
+
+            if(!isScraperCompileSuccess) {
+                println("Dynamic scraper compilation failed")
+                return null
+            }
 
             val classLoader = URLClassLoader(arrayOf(compiledDir.toURI().toURL()))
 
@@ -55,21 +57,36 @@ object ScraperCompiler {
         }
     }
 
-    private fun compileKotlin(sourceDir: File, outputDir: File): Boolean {
-        val args = mutableListOf<String>().apply {
-            add("-d")
-            add(outputDir.absolutePath)
-            add("-classpath")
-            add(System.getProperty("java.class.path"))
-            add("-no-stdlib")
-            add("-no-reflect")
-            addAll(
-                sourceDir.walkTopDown()
-                    .filter { it.isFile && it.extension == "kt" }
-                    .map { it.absolutePath }
-            )
+    private fun compileKotlin(
+        sourceDir: File,
+        outputDir: File,
+        kotlincPath: String = "kotlinc"
+    ): Boolean {
+        val sourceFiles = sourceDir.walkTopDown()
+            .filter { it.extension == "kt" }
+            .map { it.absolutePath }
+            .toList()
+
+        if (sourceFiles.isEmpty()) {
+            println("No Kotlin source files to compile.")
+            return false
         }
 
-        return CLICompiler.doMainNoExit(K2JVMCompiler(), args.toTypedArray()) == ExitCode.OK
+        val process = ProcessBuilder().apply {
+            command(
+                kotlincPath,
+                "-d", outputDir.absolutePath,
+                "-no-stdlib",
+                "-no-reflect",
+                "-cp", System.getProperty("java.class.path"),
+                *sourceFiles.toTypedArray()
+            )
+            inheritIO()
+        }.start()
+
+        val exitCode = process.waitFor()
+        println("kotlinc exited with $exitCode")
+        return exitCode == 0
     }
+
 }
