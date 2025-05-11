@@ -17,10 +17,8 @@ import org.openqa.selenium.NoSuchElementException
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
-import java.lang.management.ClassLoadingMXBean
-import java.lang.management.ManagementFactory
 import java.lang.reflect.Method
-import kotlin.reflect.KClass
+
 
 fun findLastCreatedDirectory(directoryPath: String): File? {
     val directory = File(directoryPath)
@@ -38,29 +36,86 @@ class Scraper(
     private val persistenceService: PersistenceService,
     private val driver: WebDriver,
     private val scraperTestClassName: String,
-    private var backupScraper: CompiledScraperResult?,
+    private var backupScraperPath: String?,
     private var currentScraper: CompiledScraperResult?,
     private val retries: Int,
     private val model: LLM
 ) : IScraperWrapper, Closeable {
 
-    private fun closeBackup() {
-        backupScraper?.classLoader?.close()
-        backupScraper = null
-        System.gc()
+    override suspend fun scrape(): Boolean {
+        var attempts = 0
+        var success = false
+
+        while (!success && attempts < retries) {
+            val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
+            success = runScraper(Configurations.snapshotBaseDir + currentScraperValue.scraper::class.simpleName + "/latest")
+            if (!success) {
+                println("Retry #${attempts + 1} failed.")
+            }
+            attempts++
+        }
+
+        if (!success) {
+            println("Max retries reached.")
+        }
+
+        return success
     }
 
-    private fun closeCurrent() {
-        currentScraper?.classLoader?.close()
-        currentScraper = null
-        System.gc()
+    /**
+     * Runs the given scraper.
+     *
+     * @param snapshotsPath The path to the snapshots' directory.
+     */
+    private suspend fun runScraper(snapshotsPath: String): Boolean {
+        try {
+            currentScraper?.scraper?.scrape()
+            return true
+        } catch (e: Exception) {
+
+            val lastCreated = findLastCreatedDirectory(snapshotsPath)
+                ?: throw IllegalStateException("Could not find step directory.")
+            val stepName = lastCreated.name
+
+            val exceptionsToCheck = listOf(
+                NoSuchElementException::class,
+                StaleElementReferenceException::class,
+                ElementNotInteractableException::class,
+                TimeoutException::class
+            )
+
+            for (exception in exceptionsToCheck) {
+                if (exception.isInstance(e)) {
+                    println("Caught exception: ${e::class.simpleName}")
+                    val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
+                    val modifications = getModifications(currentScraperValue.scraper.getScraperData(), stepName)
+                    val wasSuccessful = attemptCorrectingScraper(currentScraperValue.scraper.getScraperData(), modifications)
+
+                    if (!wasSuccessful) {
+                        println("Scraper correction failed.")
+                    }
+
+                    return wasSuccessful
+                }
+            }
+
+            throw e
+        }
     }
 
-    private suspend fun correctScraper(
-        oldScraper: IScraperData,
-        modifications: List<Modification<Element>>,
-    ): Boolean {
-        return attemptCorrectingScraper(oldScraper, modifications)
+    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
+        val latestSnapshot =
+            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
+        val latestStableSnapshot =
+            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
+        val latestSnapshotHtml = latestSnapshot.html.readText()
+        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
+
+        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
+        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
+
+        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
     }
 
     private suspend fun attemptCorrectingScraper(
@@ -103,15 +158,11 @@ class Scraper(
         // Overwrite scraper's source code
         persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
 
-        // First close the current classloader to avoid any leaks
-        closeCurrent()
-
-        // Make sure we wait for any lingering references to be cleaned up
-        System.gc()
-        Thread.sleep(100) // Small pause to allow GC to work
-
-        val newScraperResult =
-            ScraperCompiler.attemptToCompileAndInstantiate(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", driver, snapshotService)
+        val newScraperResult = ScraperCompiler.attemptToCompileAndInstantiate(
+            Configurations.scrapersBaseDir + "${oldScraper.name}.kt",
+            driver,
+            snapshotService
+        )
 
         if (newScraperResult == null) {
             println("Compilation of the new scraper failed")
@@ -121,71 +172,34 @@ class Scraper(
             return false
         }
 
-        // currentScraper is now the newly compiled one
-        currentScraper = newScraperResult
+        // Backup the original scraper's code
+        val backupScraper = currentScraper ?: throw IllegalStateException("Current scraper is null.")
+        backupScraperPath = backupScraper.scraper.getScraperData().path
 
-        backupScraper = currentScraper
+        // Close the current classloader to avoid any leaks
+        val newlyCompiledScraper = replaceCurrentScraper(newScraperResult)
+            ?: throw IllegalStateException("Current scraper is null after replacing")
 
-        val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null.")
+        val success = testScraper(newlyCompiledScraper)
 
-        val success = testScraper(currentScraperValue)
+        // Revert currentScraper to the backup scraper
         if (!success) {
-            // Revert currentScraper to the backup scraper
-            closeCurrent()
-            currentScraper = backupScraper
+            val backupScraperPath = backupScraperPath ?: throw IllegalStateException("Backup scraper data is null")
+
+            val oldScraperRecompiled = ScraperCompiler.attemptToCompileAndInstantiate(
+                backupScraperPath,
+                driver,
+                snapshotService
+            )
+
+            replaceCurrentScraper(oldScraperRecompiled)
+
             println("Scraper tests failed.")
             return false
         }
 
-        // Close the backup CL and attempt to eliminate it from memory
-        closeBackup()
-
-        // Save the current scraper as the new backup
-        backupScraper = currentScraper
-
         println("Scraper tests were successful!")
         return true
-    }
-
-    /**
-     * Runs the given scraper.
-     *
-     * @param snapshotsPath The path to the snapshots' directory.
-     */
-    private suspend fun runScraper(snapshotsPath: String): Boolean {
-        try {
-            currentScraper?.scraper?.scrape()
-            return true
-        } catch (e: Exception) {
-
-            val lastCreated = findLastCreatedDirectory(snapshotsPath)
-                ?: throw IllegalStateException("Could not find step directory.")
-            val stepName = lastCreated.name
-
-            val exceptionsToCheck = listOf(
-                NoSuchElementException::class,
-                StaleElementReferenceException::class,
-                ElementNotInteractableException::class,
-                TimeoutException::class
-            )
-
-            for (exception in exceptionsToCheck) {
-                if (exception.isInstance(e)) {
-                    println("Caught exception: ${e::class.simpleName}")
-                    val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
-                    val modifications = getModifications(currentScraperValue.scraper.getScraperData(), stepName)
-                    val wasSuccessful = correctScraper(currentScraperValue.scraper.getScraperData(), modifications)
-
-                    if (!wasSuccessful) {
-                        println("Scraper correction failed.")
-                    }
-
-                    return wasSuccessful
-                }
-            }
-
-            throw e
-        }
     }
 
     /**
@@ -251,73 +265,48 @@ class Scraper(
         return failedTests == 0
     }
 
+    override fun close() {
+        replaceCurrentScraper(null)
+    }
+
+//    private fun logMemoryAndClassloaderInfo(label: String) {
+//        val runtime = Runtime.getRuntime()
+//        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+//        val totalMemory = runtime.totalMemory() / (1024 * 1024)
+//
+//        println("======= $label =======")
+//        println("Memory usage: $usedMemory MB / $totalMemory MB")
+//        println("Current classloader: ${this.javaClass.classLoader}")
+//        println("Current scraper classloader: ${currentScraper?.scraper?.javaClass?.classLoader}")
+//        println("Backup scraper classloader: ${backupScraper?.scraper?.javaClass?.classLoader}")
+//
+//        // List loaded classes (for debugging severe issues)
+//        val beans = ManagementFactory.getPlatformMBeanServer()
+//        val mbean = ManagementFactory.newPlatformMXBeanProxy(
+//            beans, "com.sun.management:type=ClassLoading",
+//            ClassLoadingMXBean::class.java
+//        )
+//
+//        println("Total loaded classes: ${mbean.loadedClassCount}")
+//        println("===========================")
+//    }
+
+    private fun replaceCurrentScraper(newScraper: CompiledScraperResult?): CompiledScraperResult? {
+        currentScraper?.classLoader?.close()
+        currentScraper = null
+
+        // Call GC to clean
+        System.gc()
+        Thread.sleep(100) // Small pause to allow GC to work
+
+        currentScraper = newScraper
+
+        return currentScraper
+    }
+
     private fun getSetUpMethods(clazz: Class<*>): List<Method> =
         clazz.methods.filter { it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java) }
 
     private fun getTearDownMethods(clazz: Class<*>): List<Method> =
         clazz.methods.filter { it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java) }
-
-
-    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
-        val latestSnapshot =
-            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
-        val latestStableSnapshot =
-            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
-        val latestSnapshotHtml = latestSnapshot.html.readText()
-        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
-
-        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
-        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
-        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
-
-        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
-    }
-
-    override fun close() {
-        closeCurrent()
-        closeBackup()
-        System.gc()
-    }
-
-    override suspend fun scrape(): Boolean {
-        var attempts = 0
-        var success = false
-
-        while (!success && attempts < retries) {
-            val currentScraperValue = currentScraper ?: throw IllegalStateException("Current scraper is null")
-            success = runScraper(Configurations.snapshotBaseDir + currentScraperValue.scraper::class.simpleName + "/latest")
-            if (!success) {
-                println("Retry #${attempts + 1} failed.")
-            }
-            attempts++
-        }
-
-        if (!success) {
-            println("Max retries reached.")
-        }
-
-        return success
-    }
-
-    private fun logMemoryAndClassloaderInfo(label: String) {
-        val runtime = Runtime.getRuntime()
-        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-        val totalMemory = runtime.totalMemory() / (1024 * 1024)
-
-        println("======= $label =======")
-        println("Memory usage: $usedMemory MB / $totalMemory MB")
-        println("Current classloader: ${this.javaClass.classLoader}")
-        println("Current scraper classloader: ${currentScraper?.scraper?.javaClass?.classLoader}")
-        println("Backup scraper classloader: ${backupScraper?.scraper?.javaClass?.classLoader}")
-
-        // List loaded classes (for debugging severe issues)
-        val beans = ManagementFactory.getPlatformMBeanServer()
-        val mbean = ManagementFactory.newPlatformMXBeanProxy(
-            beans, "com.sun.management:type=ClassLoading",
-            ClassLoadingMXBean::class.java
-        )
-
-        println("Total loaded classes: ${mbean.loadedClassCount}")
-        println("===========================")
-    }
 }

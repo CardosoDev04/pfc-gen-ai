@@ -67,7 +67,7 @@ class ScraperBuilder {
             persistenceService = persistenceService ?: error("persistenceService not set"),
             driver = driver,
             scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
-            backupScraper = null,
+            backupScraperPath = "",
             currentScraper = compiled,
             retries = retries,
             model = model
