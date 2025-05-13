@@ -19,6 +19,7 @@ import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
+import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import kotlin.reflect.KClass
 
@@ -188,7 +189,7 @@ class Scraper(
         for (method in testMethods) {
             try {
                 println("Running test: ${method.name}")
-                method.invoke(testInstance)
+                invokeMethodSafely(testInstance, method)
             } catch (e: Exception) {
                 failedTests++
                 println("Test failed: ${method.name}")
@@ -200,6 +201,18 @@ class Scraper(
             .forEach { it.invoke(testInstance) }
 
         return failedTests == 0
+    }
+
+    private fun invokeMethodSafely(instance: Any, method: Method) {
+        try {
+            method.invoke(instance)
+        } catch (e: InvocationTargetException) {
+            println("InvocationTargetException caught: ${e.cause}")
+            e.cause?.printStackTrace()
+        } catch (e: Exception) {
+            println("Unexpected exception: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     private fun getTearDownMethods(clazz: KClass<*>): List<Method> =
