@@ -16,6 +16,6 @@ object Configurations {
     }
 
     val versioningBaseDir: String by lazy {
-        dotenv["TEMP_DIR"] ?: "$baseDir/versioning"
+        dotenv["TEMP_DIR"] ?: "$baseDir/versioning/"
     }
 }

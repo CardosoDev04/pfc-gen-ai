@@ -1,30 +1,49 @@
 import classes.llm.LLM
 import com.cardoso.common.buildChromeDriver
+import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
+import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import library.builder.ScraperBuilder
-import scrapers.DemoScraperTest
+import modification_detection.ModificationDetectionService
+import okhttp3.OkHttpClient
+import ollama.OllamaClient
+import persistence.implementations.FilePersistenceService
+import scrapers.DemoScraper
+import snapshots.SnapshotService
+import java.util.concurrent.TimeUnit
 
 fun main() {
-    val driver = buildChromeDriver()
-
-    val testClass = DemoScraperTest::class
-
-    val scraper = ScraperBuilder()
-        .withModel(LLM.Mistral7B.modelName)
-        .withRetries(3)
-        .build(
-            driver,
-            Configurations.scrapersBaseDir + "DemoScraper.kt",
-            testClass
-        )
-
     runBlocking {
+        val snapshotService = SnapshotService()
+        val driver = buildChromeDriver()
+        val persistenceService = FilePersistenceService()
+        val webExtractor = WebExtractor()
+        val httpClient = OkHttpClient.Builder()
+            .connectTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .build()
+        val llmClient = OllamaClient(httpClient)
+        val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName, FEW_SHOT_GET_MODIFICATION_PROMPT)
+
+        val initialScraper = DemoScraper(driver, snapshotService)
+
+        val scraper = ScraperBuilder()
+            .withModel(LLM.CodeLlama7B)
+            .withRetries(3)
+            .withSnapshotService(snapshotService)
+            .withPersistenceService(persistenceService)
+            .withWebExtractor(webExtractor)
+            .withScraperTestClassName("DemoScraperTest")
+            .withModificationDetectionService(modificationDetectionService)
+            .withDriver(driver)
+            .build(initialScraper)
+
         try {
-            scraper.scrapeWithRetries()
+            scraper.scrape()
         } catch (e: Exception) {
             println("Error during scraping: ${e.message}")
-        } finally {
-            scraper.close()
+            e.printStackTrace()
         }
     }
 }
