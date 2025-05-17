@@ -22,14 +22,14 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             driver.get("http://localhost:5173/")
 
             snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step1")
-            StepTracker.incrementStep(identifier)
 
             webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
+            StepTracker.incrementStep(identifier)
 
             val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
+            StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver, Configurations.snapshotBaseDir + "${this::class.simpleName}/latest/step2")
-            StepTracker.incrementStep(identifier)
 
             val results = optionElements.map { BookingOption(it.text) }
 
