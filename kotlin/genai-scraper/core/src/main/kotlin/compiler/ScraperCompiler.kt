@@ -78,6 +78,7 @@ object ScraperCompiler {
 
             CompiledScraperResult(scraperInstance, testInstance)
         } catch (e: Exception) {
+            println("Compilation of the new scraper failed")
             e.printStackTrace()
             null
         }

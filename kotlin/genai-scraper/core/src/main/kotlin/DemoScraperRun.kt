@@ -12,6 +12,7 @@ import scrapers.DemoScraper
 import snapshots.SnapshotService
 import java.util.concurrent.TimeUnit
 
+
 fun main() {
     runBlocking {
         val snapshotService = SnapshotService()
