@@ -61,5 +61,39 @@ fun scraper(): String {
   driver.quit()
   return "Done"
 }
+```""".trimIndent()),
+    Message("user", """{
+  "imports": "import org.openqa.selenium.By\nimport org.openqa.selenium.WebDriver\nimport org.openqa.selenium.chrome.ChromeDriver",
+  "script": "fun login(): String {\n  val driver: WebDriver = ChromeDriver()\n  driver.get(\"https://example.com/login\")\n  val usernameInput = driver.findElement(By.id(\"user-input\"))\n  usernameInput.sendKeys(\"testuser\")\n  val loginButton = driver.findElement(By.id("login-btn\"))\n  loginButton.click()\n  driver.quit()\n  return \"Login attempted\"\n}",
+  "locator_changes": [
+    {
+      "oldId": "user-input",
+      "oldCssSelector": "#user-input",
+      "newCssSelector": \"input[name='username']\"
+    },
+    {
+      "oldId": "login-btn",
+      "oldCssSelector": "#login-btn",
+      "newCssSelector": ".btn-primary.login"
+      "newId": "login-button"
+    }
+  ]
+}
+""".trimIndent()),
+    Message("assistant", """```kotlin
+import org.openqa.selenium.By
+import org.openqa.selenium.WebDriver
+import org.openqa.selenium.chrome.ChromeDriver
+
+fun login(): String {
+  val driver: WebDriver = ChromeDriver()
+  driver.get("https://example.com/login")
+  val usernameInput = driver.findElement(By.id("login-button)
+  usernameInput.sendKeys("testuser")
+  val loginButton = driver.findElement(By.cssSelector(".btn-primary.login"))
+  loginButton.click()
+  driver.quit()
+  return "Login attempted"
+}
 ```""".trimIndent())
 )

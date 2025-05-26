@@ -46,13 +46,18 @@ class Scraper(
     private val model: LLM
 ) : IScraperWrapper {
     private val changesMade = mutableSetOf<Element>()
+    private val latestDir = Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest"
+    private val latestStableDir = Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest_stable"
 
     override suspend fun scrape(): Boolean {
-        val wasSuccessful = runScraper(Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest")
+        val wasSuccessful = runScraper(latestDir)
 
         if (!wasSuccessful) {
             println("Max retries reached.")
         }
+
+        persistenceService.copyWholeDirectory(latestDir, latestStableDir)
+        persistenceService.deleteSubDirectories(latestDir)
 
         return wasSuccessful
     }
@@ -65,11 +70,6 @@ class Scraper(
     private suspend fun runScraper(snapshotsPath: String): Boolean {
         try {
             currentScraper.scrape()
-
-            persistenceService.copyWholeDirectory(
-                snapshotsPath,
-                Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest_stable"
-            )
 
             return true
         } catch (e: Exception) {
@@ -152,8 +152,8 @@ class Scraper(
     }
 
     private fun getStepHtml(scraperName: String, step: Int): Pair<String, String> {
-        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${scraperName}/latest/step$step/html/source.html")
-        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${scraperName}/latest_stable/step$step/html/source.html")
+        val latestSnapshot = snapshotService.getSnapshot("$latestDir/step$step/html/source.html")
+        val latestStableSnapshot = snapshotService.getSnapshot("$latestStableDir/step$step/html/source.html")
         val latestSnapshotHtml = latestSnapshot.html.readText()
         val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
 
@@ -165,7 +165,7 @@ class Scraper(
         val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
         val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
 
-        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
+        return listOf(modificationDetectionService.getModification(modifiedElements[0], newElements))
     }
 
     private suspend fun attemptCorrectingScraper(
@@ -217,6 +217,14 @@ class Scraper(
 
             if (wasPartiallyFixed()) {
                 // Write new code to the scraper file here because getScraperData() reads the code from the scrapers directory
+                persistenceService.copyWholeDirectory(
+                    latestDir,
+                    latestStableDir
+                )
+                persistenceService.deleteSubDirectories(
+                    latestDir
+                )
+
                 persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
                 return ScraperCorrectionResult.PartialFix
             }

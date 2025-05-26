@@ -35,4 +35,6 @@ interface PersistenceService {
     fun copyAndDeleteFile(from: String, to: String)
 
     fun copyWholeDirectory(from: String, to: String)
+
+    fun deleteSubDirectories(parentPath: String)
 }

@@ -56,7 +56,7 @@ class ModificationDetectionService(
     }
 
     override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
-        val cssSelector = CssSelector(modification.old.cssSelector, modification.new.cssSelector)
+        val cssSelector = CssSelector( modification.old.id , modification.old.cssSelector, modification.new.cssSelector, modification.new.id)
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
@@ -129,7 +129,7 @@ class ModificationDetectionService(
     }
 
     private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
-        return modifications.map { m -> CssSelector(m.old.cssSelector, m.new.cssSelector) }
+        return modifications.map { m -> CssSelector(m.old.id, m.old.cssSelector, m.new.cssSelector, m.new.id) }
     }
 
     private fun String.extractAlternative(): String {
