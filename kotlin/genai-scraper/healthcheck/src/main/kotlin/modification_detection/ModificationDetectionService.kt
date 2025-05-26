@@ -1,7 +1,6 @@
 package modification_detection
 
 import classes.data.Element
-import classes.llm.LLM
 import classes.llm.Message
 import classes.service_model.CssSelector
 import classes.service_model.Modification
@@ -23,8 +22,7 @@ import kotlinx.serialization.encodeToString
  */
 class ModificationDetectionService(
     private val llmClient: ILLMClient,
-    private val getModificationModel: String,
-    private val getModificationMessageHistory: List<Message>,
+    private val getModificationModel: String
 ) : IModificationDetectionService {
     override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
         return previousElements.filterNot { previousElement ->

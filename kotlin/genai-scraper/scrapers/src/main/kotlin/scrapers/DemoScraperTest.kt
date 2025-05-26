@@ -5,14 +5,11 @@ import interfaces.IScraper
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.openqa.selenium.WebDriver
-import snapshots.ISnapshotService
-import snapshots.SnapshotService
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DemoScraperTest(val scraper: IScraper) {
 
     private val driver: WebDriver = buildChromeDriver()
-    private val snapshotService: ISnapshotService = SnapshotService()
 
     @Test
     fun `scrape should return list of BookingOption from real page`() {

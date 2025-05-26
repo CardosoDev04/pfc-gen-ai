@@ -49,6 +49,7 @@ class WebExtractor {
             select,
             textarea,
             label,
+            h1,
             [onclick],
             [tabindex],
             [role=button],

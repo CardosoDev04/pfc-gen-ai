@@ -11,16 +11,21 @@ import java.nio.file.StandardCopyOption
 /**
  * A service for taking and managing snapshots of web pages.
  */
-class SnapshotService: ISnapshotService {
+class SnapshotService(private val className: String): ISnapshotService {
+    private var currentStepN = 1
 
-    /**
-     * Takes a snapshot of the current state of the web page and saves it as a file.
-     *
-     * @param driver The WebDriver instance used to take the snapshot.
-     * @param path The path where the snapshot file will be saved.
-     * @return The file containing the snapshot.
-     */
-    override fun takeSnapshotAsFile(driver: WebDriver, path: String): File {
+    // Clear the snapshots directory
+    init {
+        val snapshotsDir = File(Configurations.snapshotBaseDir + "$className/latest")
+        if (!snapshotsDir.exists() || !snapshotsDir.isDirectory) {
+            throw IllegalStateException("Snapshots directory for $className not found")
+        }
+
+        snapshotsDir.listFiles()?.forEach { it.deleteRecursively() }
+    }
+
+    override fun takeSnapshotAsFile(driver: WebDriver): File {
+        val path = Configurations.snapshotBaseDir + "$className/latest/step${currentStepN}"
         val destFile = File("$path/screenshot.png")
         destFile.parentFile.mkdirs()
         val screenshot = (driver as TakesScreenshot).getScreenshotAs(OutputType.FILE)
@@ -32,15 +37,11 @@ class SnapshotService: ISnapshotService {
         htmlFile.parentFile.mkdirs()
         driver.pageSource?.let { htmlFile.writeText(it) }
 
+        currentStepN++
+
         return destFile
     }
 
-    /**
-     * Retrieves a snapshot from the given HTML file path.
-     *
-     * @param htmlPath The path to the HTML file.
-     * @return The Snapshot object containing the HTML file.
-     */
     override fun getSnapshot(htmlPath: String): Snapshot {
         val htmlFile = File(htmlPath)
         return Snapshot(htmlFile)

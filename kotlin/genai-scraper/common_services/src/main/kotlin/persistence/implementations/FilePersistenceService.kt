@@ -42,6 +42,29 @@ class FilePersistenceService(
         deleteFile(from)
     }
 
+    override fun copyWholeDirectory(from: String, to: String) {
+        val sourceDir = File(from)
+        val destDir = File(to)
+        if (!sourceDir.exists() || !sourceDir.isDirectory) return
+
+        copyRecursively(sourceDir, destDir)
+    }
+
+    private fun copyRecursively(src: File, dst: File) {
+        if (src.isDirectory) {
+            if (!dst.exists()) dst.mkdirs()
+            src.listFiles()?.forEach { child ->
+                copyRecursively(child, File(dst, child.name))
+            }
+        } else {
+            src.inputStream().use { input ->
+                dst.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+    }
+
     private fun deleteFile(path: String) {
         val toDelete = File(path)
 

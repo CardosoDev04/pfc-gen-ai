@@ -1,6 +1,5 @@
 import classes.llm.LLM
 import com.cardoso.common.buildChromeDriver
-import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
 import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import library.builder.ScraperBuilder
@@ -15,7 +14,7 @@ import java.util.concurrent.TimeUnit
 
 fun main() {
     runBlocking {
-        val snapshotService = SnapshotService()
+        val snapshotService = SnapshotService(DemoScraper::class.simpleName ?: "")
         val driver = buildChromeDriver()
         val persistenceService = FilePersistenceService()
         val webExtractor = WebExtractor()
@@ -25,7 +24,7 @@ fun main() {
             .writeTimeout(120, TimeUnit.SECONDS)
             .build()
         val llmClient = OllamaClient(httpClient)
-        val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName, FEW_SHOT_GET_MODIFICATION_PROMPT)
+        val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName)
 
         val initialScraper = DemoScraper(driver, snapshotService)
 

@@ -33,4 +33,6 @@ interface PersistenceService {
      * @param to The path of the file to paste the contents into.
      */
     fun copyAndDeleteFile(from: String, to: String)
+
+    fun copyWholeDirectory(from: String, to: String)
 }

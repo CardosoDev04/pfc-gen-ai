@@ -45,6 +45,7 @@ class Scraper(
     private val retries: Int,
     private val model: LLM
 ) : IScraperWrapper {
+    private val changesMade = mutableSetOf<Element>()
 
     override suspend fun scrape(): Boolean {
         val wasSuccessful = runScraper(Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest")
@@ -64,12 +65,18 @@ class Scraper(
     private suspend fun runScraper(snapshotsPath: String): Boolean {
         try {
             currentScraper.scrape()
+
+            persistenceService.copyWholeDirectory(
+                snapshotsPath,
+                Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest_stable"
+            )
+
             return true
         } catch (e: Exception) {
 
             val lastCreated = findLastCreatedDirectory(snapshotsPath)
                 ?: throw IllegalStateException("Could not find step directory.")
-            val stepName = lastCreated.name
+            val lastSuccessfulStep = lastCreated.name
 
             val exceptionsToCheck = listOf(
                 NoSuchElementException::class,
@@ -82,7 +89,7 @@ class Scraper(
                 if (exception.isInstance(e)) {
                     println("Caught exception: ${e::class.simpleName}")
 
-                    val wasSuccessful = correctScraper(currentScraper, stepName)
+                    val wasSuccessful = correctScraper(currentScraper, lastSuccessfulStep)
 
                     if (!wasSuccessful) {
                         println("Scraper correction failed.")
@@ -96,46 +103,69 @@ class Scraper(
         }
     }
 
-    private suspend fun getModifications(oldScraper: IScraperData, stepName: String): List<Modification<Element>> {
-        val latestSnapshot =
-            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest/$stepName/html/source.html")
-        val latestStableSnapshot =
-            snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${oldScraper.name}/latest_stable/$stepName/html/source.html")
-        val latestSnapshotHtml = latestSnapshot.html.readText()
-        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
-
-        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
-        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
-        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
-
-        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
-    }
-
     private suspend fun correctScraper(
         oldScraper: IScraper,
         stepName: String
     ): Boolean {
+        var step = stepName.last().digitToInt()
         var attempts = 0
 
         while (attempts < retries) {
             val currentScraperData = currentScraper.getScraperData()
+            val (lastStableHtml, latestHtml) = getStepHtml(currentScraperData.name, step)
+            val unprocessedModifications = mutableListOf<Modification<Element>>()
 
-            val modifications = getModifications(currentScraperData, stepName)
-            val result = attemptCorrectingScraper(currentScraperData, modifications)
+            val modifications = getModifications(lastStableHtml, latestHtml)
+
+            modifications.forEach { modification ->
+                if (!hasBeenProcessed(modification)) {
+                    changesMade.add(modification.old)
+                    unprocessedModifications.add(modification)
+                }
+            }
+
+            if (unprocessedModifications.isEmpty()) {
+                return false
+            }
+
+            val result = attemptCorrectingScraper(currentScraperData, unprocessedModifications)
 
             if (result == ScraperCorrectionResult.Success) {
                 println("Scraper correction successful")
                 break
             } else if (result == ScraperCorrectionResult.PartialFix) {
                 println("Scraper partially fixed")
+                step++
             } else if (result == ScraperCorrectionResult.Failure) {
-                println("Retry #${attempts + 1} failed.")
-                attempts++
+                println("Retry #${++attempts} failed.")
+                modifications.forEach { modification -> changesMade.remove(modification.old) }
                 currentScraper = oldScraper
             }
         }
 
         return attempts < retries
+    }
+
+    private fun hasBeenProcessed(modification: Modification<Element>): Boolean {
+        return changesMade.contains(modification.old) ||
+            changesMade.any { it.id == modification.old.id }
+    }
+
+    private fun getStepHtml(scraperName: String, step: Int): Pair<String, String> {
+        val latestSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${scraperName}/latest/step$step/html/source.html")
+        val latestStableSnapshot = snapshotService.getSnapshot(Configurations.snapshotBaseDir + "${scraperName}/latest_stable/step$step/html/source.html")
+        val latestSnapshotHtml = latestSnapshot.html.readText()
+        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
+
+        return Pair(latestSnapshotHtml, latestStableSnapshotHtml)
+    }
+
+    private suspend fun getModifications(latestSnapshotHtml: String, latestStableSnapshotHtml: String): List<Modification<Element>> {
+        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
+        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
+        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
+
+        return modifiedElements.map { modificationDetectionService.getModification(it, newElements) }
     }
 
     private suspend fun attemptCorrectingScraper(
