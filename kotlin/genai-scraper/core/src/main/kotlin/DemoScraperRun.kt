@@ -3,7 +3,7 @@ import com.cardoso.common.buildChromeDriver
 import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import library.builder.ScraperBuilder
-import modification_detection.ModificationDetectionService
+import modification_detection.ModificationService
 import okhttp3.OkHttpClient
 import ollama.OllamaClient
 import persistence.implementations.FilePersistenceService
@@ -24,7 +24,7 @@ fun main() {
             .writeTimeout(120, TimeUnit.SECONDS)
             .build()
         val llmClient = OllamaClient(httpClient)
-        val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName)
+        val modificationDetectionService = ModificationService(llmClient, LLM.Gemma3_4B.modelName)
 
         val scraper = ScraperBuilder()
             .withModel(LLM.CodeLlama7B)

@@ -2,7 +2,7 @@ package library.builder
 
 import classes.llm.LLM
 import html_fetcher.WebExtractor
-import modification_detection.IModificationDetectionService
+import modification_detection.IModificationService
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
@@ -11,7 +11,7 @@ import kotlin.reflect.KClass
 
 class ScraperBuilder {
 
-    private var modificationDetectionService: IModificationDetectionService? = null
+    private var modificationDetectionService: IModificationService? = null
     private var snapshotService: ISnapshotService? = null
     private var webExtractor: WebExtractor? = null
     private var persistenceService: PersistenceService? = null
@@ -20,7 +20,7 @@ class ScraperBuilder {
     private var model: LLM = LLM.Mistral7B
     private var driver: WebDriver? = null
 
-    fun withModificationDetectionService(service: IModificationDetectionService) = apply {
+    fun withModificationDetectionService(service: IModificationService) = apply {
         this.modificationDetectionService = service
     }
 

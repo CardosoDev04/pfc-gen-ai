@@ -20,10 +20,10 @@ import kotlinx.serialization.encodeToString
  *
  * @property llmClient The client for interacting with the LLM.
  */
-class ModificationDetectionService(
+class ModificationService(
     private val llmClient: ILLMClient,
     private val getModificationModel: String
-) : IModificationDetectionService {
+) : IModificationService {
     override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->

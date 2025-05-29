@@ -4,7 +4,7 @@ import classes.data.Element
 import classes.llm.Message
 import classes.service_model.Modification
 
-interface IModificationDetectionService {
+interface IModificationService {
     /**
      * Gets the missing elements between the previous and new HTML states.
      *
