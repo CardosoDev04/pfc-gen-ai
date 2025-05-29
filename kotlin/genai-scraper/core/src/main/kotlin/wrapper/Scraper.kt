@@ -1,37 +1,19 @@
 package wrapper
 
 import Configurations
-import classes.data.Element
 import classes.llm.LLM
-import classes.service_model.Modification
+import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
-import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-import enums.ScraperCorrectionResult
 import html_fetcher.WebExtractor
 import interfaces.IScraper
-import interfaces.IScraperData
 import modification_detection.IModificationDetectionService
-import org.openqa.selenium.ElementNotInteractableException
-import org.openqa.selenium.NoSuchElementException
-import org.openqa.selenium.StaleElementReferenceException
-import org.openqa.selenium.TimeoutException
-import org.openqa.selenium.WebDriver
+import org.openqa.selenium.*
 import persistence.PersistenceService
 import snapshots.ISnapshotService
-import steptracker.StepTracker
 import java.io.File
-import java.lang.reflect.Method
 import kotlin.reflect.KClass
-
-fun findLastCreatedDirectory(directoryPath: String): File? {
-    val directory = File(directoryPath)
-    if (!directory.exists() || !directory.isDirectory) {
-        throw IllegalArgumentException("The provided path is not a valid directory")
-    }
-
-    return directory.listFiles { file -> file.isDirectory }?.maxByOrNull { it.lastModified() }
-}
+import kotlin.reflect.full.isSubclassOf
 
 class Scraper(
     private val modificationDetectionService: IModificationDetectionService,
@@ -39,265 +21,92 @@ class Scraper(
     private val webExtractor: WebExtractor,
     private val persistenceService: PersistenceService,
     private val driver: WebDriver,
-    private val scraperTestClassName: String,
-    private var backupScraper: IScraper?,
-    private var currentScraper: IScraper,
+    private val scraperKlass: KClass<*>,
     private val retries: Int,
     private val model: LLM
 ) : IScraperWrapper {
-    private val changesMade = mutableSetOf<Element>()
-    private val latestDir = Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest"
-    private val latestStableDir = Configurations.snapshotBaseDir + currentScraper::class.simpleName + "/latest_stable"
+    private val stableScraperPath = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/stable/scraper"
+    private val initialScraperOutDir = "$stableScraperPath/out"
+    private val latestSnapshotPath = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/latest"
+    private val testRunPath = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/test"
 
-    override suspend fun scrape(): Boolean {
-        val wasSuccessful = runScraper(latestDir)
-
-        if (!wasSuccessful) {
-            println("Max retries reached.")
+    init {
+        if (!scraperKlass.isSubclassOf(IScraper::class)) {
+            throw IllegalArgumentException("Provided class must implement IScraper interface")
         }
 
-        persistenceService.copyWholeDirectory(latestDir, latestStableDir)
-        persistenceService.deleteSubDirectories(latestDir)
-
-        return wasSuccessful
+        if (scraperKlass.simpleName == null || scraperKlass.simpleName!!.isEmpty()) {
+            throw IllegalArgumentException("Scraper class name cannot be null or empty")
+        }
     }
 
     /**
-     * Runs the given scraper.
+     * Performs web scraping using the provided scraper class.
      *
-     * @param snapshotsPath The path to the snapshots' directory.
+     * @return Boolean indicating whether the scraping was successful or if it needs correction.
      */
-    private suspend fun runScraper(snapshotsPath: String): Boolean {
-        try {
-            currentScraper.scrape()
+    override suspend fun scrape(): Boolean {
+        val compilationResult = compileAndInstantiateScraper(scraperKlass, "$stableScraperPath/${scraperKlass.simpleName}.kt", "$stableScraperPath/${scraperKlass.simpleName}Test.kt")
+        val scraperInstance = compilationResult.scraperInstance
+        val testInstance = compilationResult.testInstance
 
+        try {
+            scraperInstance.scrape()
             return true
         } catch (e: Exception) {
-
-            val lastCreated = findLastCreatedDirectory(snapshotsPath)
-                ?: throw IllegalStateException("Could not find step directory.")
-            val lastSuccessfulStep = lastCreated.name
-
-            val exceptionsToCheck = listOf(
+            val seleniumExceptionTypes = setOf(
                 NoSuchElementException::class,
-                StaleElementReferenceException::class,
                 ElementNotInteractableException::class,
+                StaleElementReferenceException::class,
                 TimeoutException::class
             )
 
-            for (exception in exceptionsToCheck) {
-                if (exception.isInstance(e)) {
-                    println("Caught exception: ${e::class.simpleName}")
-
-                    val wasSuccessful = correctScraper(currentScraper, lastSuccessfulStep)
-
-                    if (!wasSuccessful) {
-                        println("Scraper correction failed.")
-                    }
-
-                    return wasSuccessful
-                }
+            if (seleniumExceptionTypes.any { it.isInstance(e) }) {
+                println("Scraping exception occurred: ${e.message}. Trying to correct...")
+                // return correctScraper()
+            } else {
+                snapshotService.takeSnapshotAsFile(driver)
+                throw e
             }
 
-            throw e
-        }
-    }
-
-    private suspend fun correctScraper(
-        oldScraper: IScraper,
-        stepName: String
-    ): Boolean {
-        var step = stepName.last().digitToInt()
-        var attempts = 0
-
-        while (attempts < retries) {
-            val currentScraperData = currentScraper.getScraperData()
-            val (lastStableHtml, latestHtml) = getStepHtml(currentScraperData.name, step)
-            val unprocessedModifications = mutableListOf<Modification<Element>>()
-
-            val modifications = getModifications(lastStableHtml, latestHtml)
-
-            modifications.forEach { modification ->
-                if (!hasBeenProcessed(modification)) {
-                    changesMade.add(modification.old)
-                    unprocessedModifications.add(modification)
-                }
-            }
-
-            if (unprocessedModifications.isEmpty()) {
-                return false
-            }
-
-            val result = attemptCorrectingScraper(currentScraperData, unprocessedModifications)
-
-            if (result == ScraperCorrectionResult.Success) {
-                println("Scraper correction successful")
-                break
-            } else if (result == ScraperCorrectionResult.PartialFix) {
-                println("Scraper partially fixed")
-                step++
-            } else if (result == ScraperCorrectionResult.Failure) {
-                println("Retry #${++attempts} failed.")
-                modifications.forEach { modification -> changesMade.remove(modification.old) }
-                currentScraper = oldScraper
-            }
+            return false
         }
 
-        return attempts < retries
-    }
-
-    private fun hasBeenProcessed(modification: Modification<Element>): Boolean {
-        return changesMade.contains(modification.old) ||
-            changesMade.any { it.id == modification.old.id }
-    }
-
-    private fun getStepHtml(scraperName: String, step: Int): Pair<String, String> {
-        val latestSnapshot = snapshotService.getSnapshot("$latestDir/step$step/html/source.html")
-        val latestStableSnapshot = snapshotService.getSnapshot("$latestStableDir/step$step/html/source.html")
-        val latestSnapshotHtml = latestSnapshot.html.readText()
-        val latestStableSnapshotHtml = latestStableSnapshot.html.readText()
-
-        return Pair(latestSnapshotHtml, latestStableSnapshotHtml)
-    }
-
-    private suspend fun getModifications(latestSnapshotHtml: String, latestStableSnapshotHtml: String): List<Modification<Element>> {
-        val previousElements = webExtractor.getRelevantHTMLElements(latestStableSnapshotHtml)
-        val newElements = webExtractor.getRelevantHTMLElements(latestSnapshotHtml)
-        val modifiedElements = modificationDetectionService.getMissingElements(previousElements, newElements)
-
-        return listOf(modificationDetectionService.getModification(modifiedElements[0], newElements))
-    }
-
-    private suspend fun attemptCorrectingScraper(
-        oldScraper: IScraperData,
-        modifications: List<Modification<Element>>
-    ): ScraperCorrectionResult {
-        // Get the fixed script from the LLM
-        val newScript = when (model.modelName) {
-            LLM.Mistral7B.modelName -> modificationDetectionService.modifyScriptChatHistory(
-                oldScraper.code,
-                modifications,
-                LLM.Mistral7B.modelName,
-                FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-            )
-
-            LLM.CodeLlama7B.modelName -> modificationDetectionService.modifyScriptChatHistory(
-                oldScraper.code,
-                modifications,
-                LLM.CodeLlama7B.modelName,
-                FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-            )
-
-            LLM.DeepSeekCoder1Point3B.modelName -> modificationDetectionService.modifyScriptChatHistory(
-                oldScraper.code,
-                modifications,
-                LLM.DeepSeekCoder1Point3B.modelName,
-                FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-            )
-
-            LLM.Gemma3_1B.modelName -> modificationDetectionService.modifyScriptChatHistory(
-                oldScraper.code,
-                modifications,
-                LLM.Gemma3_1B.modelName,
-                FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-            )
-
-            else -> throw Exception("Unrecognized model name.")
-        }
-
-        val newScraperResult = ScraperCompiler.attemptToCompileAndInstantiate(oldScraper.name, newScript, driver, snapshotService, scraperTestClassName)
-            ?: return ScraperCorrectionResult.Failure
-
-        backupScraper = currentScraper
-        currentScraper = newScraperResult.scraperInstance
-
-        val success = testScraper(newScraperResult.testInstance)
-
-        if (!success) {
-
-            if (wasPartiallyFixed()) {
-                // Write new code to the scraper file here because getScraperData() reads the code from the scrapers directory
-                persistenceService.copyWholeDirectory(
-                    latestDir,
-                    latestStableDir
-                )
-                persistenceService.deleteSubDirectories(
-                    latestDir
-                )
-
-                persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
-                return ScraperCorrectionResult.PartialFix
-            }
-
-            // Revert currentScraper to the backup scraper
-            val backupScraperValue = backupScraper ?: throw IllegalStateException("Backup scraper is null.")
-            currentScraper = backupScraperValue
-            return ScraperCorrectionResult.Failure
-        }
-
-        // Save the current scraper as the new backup
-        backupScraper = currentScraper
-
-        // Overwrite scraper's source code
-        persistenceService.write(Configurations.scrapersBaseDir + "${oldScraper.name}.kt", newScript)
-
-        return ScraperCorrectionResult.Success
     }
 
     /**
-     * Tests the given CompiledScraperResult.
-     * This updated method takes the CompiledScraperResult directly rather than just the IScraper instance
-     * to ensure we're using the correct classloader for both the test class and scraper.
+     * Compiles the scraper's and test's code.
      *
-     * @param testInstance The compiled scraper test instance
+     * @param scraperKlass The KClass of the scraper to be compiled.
+     * @param scraperCodePath The path to the scraper code file.
+     * @return CompiledScraperResult containing the instantiated scraper and test classes.
      */
-    private fun testScraper(testInstance: Any): Boolean {
-        println("Testing scraper...")
+    private fun compileAndInstantiateScraper(scraperKlass: KClass<*>, scraperCodePath: String, testFilePath: String ): CompiledScraperResult {
+        val className = scraperKlass.simpleName!!
+        val scraperFile = File(scraperCodePath)
+        val scraperDir = scraperFile.parentFile
+        val testFile = File(testFilePath)
+        val testDir = testFile.parentFile
+        val outDir = File(initialScraperOutDir)
 
-        getSetUpMethods(testInstance::class)
-            .forEach { it.invoke(testInstance) }
-
-        // Run all tests from the test class
-        val testMethods = testInstance::class.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
+        if (!scraperFile.exists() || !testFile.exists()) {
+            throw IllegalArgumentException("Scraper or test file does not exist")
         }
 
-        var failedTests = 0
+        val compileResult = ScraperCompiler.attemptToCompileAndInstantiate(
+            scraperName = className,
+            scraperSourceDir = scraperDir,
+            testSourceDir = testDir,
+            outputDir = outDir,
+            driver = driver,
+            snapshotService = snapshotService
+        )
 
-        for (method in testMethods) {
-            try {
-                println("Running test: ${method.name}")
-                method.invoke(testInstance)
-            } catch (e: Exception) {
-                failedTests++
-                println("Test failed: ${method.name}")
-                println(e.cause?.message?.substringBefore("Build info:"))
-                println(e.printStackTrace())
-            }
+        if (compileResult == null) {
+            throw IllegalStateException("Failed to compile scraper: $className")
         }
 
-        getTearDownMethods(testInstance::class)
-            .forEach { it.invoke(testInstance) }
-
-        return failedTests == 0
+        return compileResult
     }
 
-    /**
-     * Checks if the scraper was partially fixed by comparing the number of steps completed of the last two runs.
-     * @return true if the last run had more steps completed than the second last run, meaning it was partially fixed, false otherwise.
-     */
-    private fun wasPartiallyFixed(): Boolean {
-        val (secondLastRunSteps, lastRunSteps) = StepTracker.getTwoLastRuns()
-        return lastRunSteps > secondLastRunSteps
-    }
-
-    private fun getTearDownMethods(clazz: KClass<*>): List<Method> =
-        clazz.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java)
-        }
-
-    private fun getSetUpMethods(clazz: KClass<*>): List<Method> =
-        clazz.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java)
-        }
 }

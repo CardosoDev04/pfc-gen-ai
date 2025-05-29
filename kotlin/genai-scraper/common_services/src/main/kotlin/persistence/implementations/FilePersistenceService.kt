@@ -111,4 +111,13 @@ class FilePersistenceService(
         val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmSS").withZone(ZoneId.systemDefault())
         return formatter.format(Instant.now())
     }
+
+    fun findLastCreatedDirectory(directoryPath: String): File? {
+        val directory = File(directoryPath)
+        if (!directory.exists() || !directory.isDirectory) {
+            throw IllegalArgumentException("The provided path is not a valid directory")
+        }
+
+        return directory.listFiles { file -> file.isDirectory }?.maxByOrNull { it.lastModified() }
+    }
 }

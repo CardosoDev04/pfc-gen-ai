@@ -2,12 +2,12 @@ package library.builder
 
 import classes.llm.LLM
 import html_fetcher.WebExtractor
-import interfaces.IScraper
 import modification_detection.IModificationDetectionService
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import wrapper.Scraper
+import kotlin.reflect.KClass
 
 class ScraperBuilder {
 
@@ -52,16 +52,14 @@ class ScraperBuilder {
         this.driver = driver
     }
 
-    fun build(initialScraper: IScraper): Scraper {
+    fun build(scraperKlass: KClass<*>): Scraper {
 
         return Scraper(
             modificationDetectionService = modificationDetectionService ?: error("modificationDetectionService not set"),
             snapshotService = snapshotService!!,
             webExtractor = webExtractor ?: error("webExtractor not set"),
             persistenceService = persistenceService ?: error("persistenceService not set"),
-            backupScraper = null,
-            scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
-            currentScraper = initialScraper,
+            scraperKlass = scraperKlass,
             retries = retries,
             model = model,
             driver = driver ?: error("driver not set")

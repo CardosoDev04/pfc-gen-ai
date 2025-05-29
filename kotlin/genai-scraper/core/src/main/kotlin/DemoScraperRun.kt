@@ -7,8 +7,8 @@ import modification_detection.ModificationDetectionService
 import okhttp3.OkHttpClient
 import ollama.OllamaClient
 import persistence.implementations.FilePersistenceService
-import scrapers.DemoScraper
 import snapshots.SnapshotService
+import scraper.DemoScraper
 import java.util.concurrent.TimeUnit
 
 
@@ -26,8 +26,6 @@ fun main() {
         val llmClient = OllamaClient(httpClient)
         val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName)
 
-        val initialScraper = DemoScraper(driver, snapshotService)
-
         val scraper = ScraperBuilder()
             .withModel(LLM.CodeLlama7B)
             .withRetries(3)
@@ -37,7 +35,7 @@ fun main() {
             .withScraperTestClassName("DemoScraperTest")
             .withModificationDetectionService(modificationDetectionService)
             .withDriver(driver)
-            .build(initialScraper)
+            .build(DemoScraper::class)
 
         try {
             scraper.scrape()

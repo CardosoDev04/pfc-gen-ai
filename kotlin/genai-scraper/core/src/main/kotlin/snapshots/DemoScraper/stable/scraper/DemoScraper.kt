@@ -1,4 +1,4 @@
-package scrapers
+package scraper
 
 import Configurations
 import classes.data.BookingOption
@@ -21,7 +21,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
             driver.get("http://localhost:5173/")
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-btn"))).click() // Changed from "search-button" to "search-btn"
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click() // Changed from "search-button" to "search-btn"
             StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver)
@@ -41,7 +41,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
     }
 
     override fun getScraperData(): IScraperData = DemoScraperDataBundle(
-        path = Configurations.scrapersBaseDir + this::class.simpleName + ".kt",
+        path = Configurations.snapshotBaseDir + "stable/" + this::class.simpleName + ".kt",
         compiledClass = this
     )
 }
