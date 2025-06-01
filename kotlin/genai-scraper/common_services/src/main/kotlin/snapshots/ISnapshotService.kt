@@ -5,6 +5,8 @@ import org.openqa.selenium.WebDriver
 import java.io.File
 
 interface ISnapshotService {
+    var isFirstRun: Boolean
+
     /**
      * Takes a snapshot of the current state of the web page and saves it as a file.
      *

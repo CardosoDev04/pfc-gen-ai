@@ -1,6 +1,7 @@
 package modification_detection
 
 import classes.data.Element
+import classes.llm.LLM
 import classes.llm.Message
 import classes.service_model.CssSelector
 import classes.service_model.Modification
@@ -22,7 +23,8 @@ import kotlinx.serialization.encodeToString
  */
 class ModificationService(
     private val llmClient: ILLMClient,
-    private val getModificationModel: String
+    private val getModificationModel: String,
+    private val elementExtractingModel: String
 ) : IModificationService {
     override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
         return previousElements.filterNot { previousElement ->
@@ -86,6 +88,21 @@ class ModificationService(
         val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
 
         return getModifiedScript(modelName, updatedMessages)
+    }
+
+    override suspend fun getElementsFromScript(scraperCode: String, system: String, prompt: String): List<Element> {
+        val ollamaGenerateRequest = OllamaGenerateRequest(
+            model = elementExtractingModel,
+            system = system,
+            prompt = prompt,
+            stream = false,
+            raw = false,
+        )
+
+        val ollamaGenerateResponse = llmClient.generate(ollamaGenerateRequest)
+
+        // TODO("Find which response format is best and parse it")
+        return listOf()
     }
 
     private suspend fun getModifiedScript(modelName: String, messages: List<Message>): String {

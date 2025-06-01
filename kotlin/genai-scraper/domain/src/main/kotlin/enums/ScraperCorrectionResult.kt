@@ -1,7 +1,9 @@
 package enums
 
-enum class ScraperCorrectionResult {
-    Failure,
-    PartialFix,
-    Success,
+import interfaces.IScraper
+
+sealed class ScraperCorrectionResult {
+    data object Failure : ScraperCorrectionResult()
+    data class PartialFix(val stepsAchieved: Int) : ScraperCorrectionResult()
+    data class Success(val correctedScraper: IScraper) : ScraperCorrectionResult()
 }

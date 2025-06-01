@@ -53,4 +53,14 @@ interface IModificationService {
      * @return The modified script.
      */
     suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String
+
+    /**
+     * Get elements interacted with in the scraper
+     *
+     * @param scraperCode The script to extract the elements from
+     * @param system The system prompt to use
+     * @param prompt The prompt to use
+     * @return The list of elements of the script
+     */
+    suspend fun getElementsFromScript(scraperCode: String, system: String, prompt: String): List<Element>
 }

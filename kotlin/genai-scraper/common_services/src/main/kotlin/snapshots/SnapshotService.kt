@@ -12,6 +12,7 @@ import java.nio.file.StandardCopyOption
  * A service for taking and managing snapshots of web pages.
  */
 class SnapshotService(private val className: String): ISnapshotService {
+    override var isFirstRun = true
     private var currentStepN = 1
 
     // Clear the snapshots directory
@@ -25,7 +26,12 @@ class SnapshotService(private val className: String): ISnapshotService {
     }
 
     override fun takeSnapshotAsFile(driver: WebDriver): File {
-        val path = Configurations.snapshotBaseDir + "$className/latest/step${currentStepN}"
+        val path = if (isFirstRun){
+            Configurations.snapshotBaseDir + "$className/latest/step${currentStepN}"
+        } else {
+            Configurations.snapshotBaseDir + "$className/test/step${currentStepN}"
+        }
+
         val destFile = File("$path/screenshot.png")
         destFile.parentFile.mkdirs()
         val screenshot = (driver as TakesScreenshot).getScreenshotAs(OutputType.FILE)
