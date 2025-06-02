@@ -8,6 +8,7 @@ import classes.service_model.Modification
 import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
+import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
 import enums.ScraperCorrectionResult
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -30,18 +31,19 @@ class Scraper(
     private val maxRetries: Int,
     private val model: LLM
 ) : IScraperWrapper {
-    private val stableScraperBaseDir = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/stable/scraper"
+    private val stableBaseDir = "${Configurations.snapshotBaseDir}/${scraperKlass.simpleName}/stable"
+    private val stableScraperBaseDir = "$stableBaseDir/scraper"
 
-    private val latestBaseDir = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/latest"
+    private val latestBaseDir = "${Configurations.snapshotBaseDir}/${scraperKlass.simpleName}/latest"
     private val latestScraperBaseDir = "$latestBaseDir/scraper"
     private val latestHtmlBaseDir = "$latestBaseDir/html"
 
-    private val testBaseDir = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/test"
+    private val testBaseDir = "${Configurations.snapshotBaseDir}/${scraperKlass.simpleName}/test"
     private val testScraperBaseDir = "$testBaseDir/scraper"
     private val testHtmlBaseDirPath = "$testBaseDir/html"
 
     private val initialScraperOutDir = "$stableScraperBaseDir/out"
-    private val latestSnapshotPath = "${Configurations.snapshotBaseDir}${scraperKlass.simpleName}/latest"
+    private val latestSnapshotPath = "${Configurations.snapshotBaseDir}/${scraperKlass.simpleName}/latest"
 
     private val scraperCorrectionHistory = mutableListOf<ScraperCorrection>()
 
@@ -61,12 +63,11 @@ class Scraper(
      * @return The result of the scraping
      */
     override suspend fun scrape(): Any {
-        val scraperPath = "$stableScraperBaseDir/${scraperKlass.simpleName}.kt"
-        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt")
-        val scraperInstance = compilationResult.scraperInstance
+        val scraperInstance = compileAndCopyToLatest()
 
         try {
             return scraperInstance.scrape()
+                .also { persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir) }
         } catch (e: Exception) {
             val seleniumExceptionTypes = setOf(
                 NoSuchElementException::class,
@@ -86,6 +87,14 @@ class Scraper(
         }
     }
 
+    private fun compileAndCopyToLatest(): IScraper {
+        val scraperPath = "$stableScraperBaseDir/${scraperKlass.simpleName}.kt"
+        val scraperCode = persistenceService.read(scraperPath)
+        persistenceService.write("$latestScraperBaseDir/${scraperKlass.simpleName}.kt", scraperCode)
+        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt")
+        return compilationResult.scraperInstance
+    }
+
     private suspend fun attemptCorrectingScraper(): Any {
         var retries = 0
 
@@ -94,6 +103,7 @@ class Scraper(
 
             if (correctionResult is ScraperCorrectionResult.Success) {
                 return correctionResult.correctedScraper.scrape()
+                    .also { persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir) }
             } else if (correctionResult is ScraperCorrectionResult.Failure) {
                 retries++
             }
@@ -125,8 +135,7 @@ class Scraper(
         val missingElements = getMissingElements(scraperCode, htmlElements)
         val alternativeElements = missingElements.map { getAlternative(it, htmlElements) }
 
-        // TODO("Figure out what model to use as well as the list of messages for few shot prompting")
-        val newScript = modificationService.modifyScriptChatHistory(scraperCode, alternativeElements, LLM.Mistral7B.modelName, listOf())
+        val newScript = modificationService.modifyScriptChatHistory(scraperCode, alternativeElements, model.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
 
         val newScraperPath = "$testScraperBaseDir/${scraperKlass.simpleName}"
         persistenceService.write(newScraperPath, newScript)

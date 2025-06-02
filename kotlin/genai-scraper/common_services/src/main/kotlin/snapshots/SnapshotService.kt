@@ -27,9 +27,9 @@ class SnapshotService(private val className: String): ISnapshotService {
 
     override fun takeSnapshotAsFile(driver: WebDriver): File {
         val path = if (isFirstRun){
-            Configurations.snapshotBaseDir + "$className/latest/step${currentStepN}"
+            Configurations.snapshotBaseDir + "$className/latest/steps/${currentStepN}"
         } else {
-            Configurations.snapshotBaseDir + "$className/test/step${currentStepN}"
+            Configurations.snapshotBaseDir + "$className/test/steps/${currentStepN}"
         }
 
         val destFile = File("$path/screenshot.png")

@@ -8,10 +8,10 @@ object Configurations {
     }
 
     val snapshotBaseDir: String by lazy {
-        dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots/"
+        dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots"
     }
 
     val versioningBaseDir: String by lazy {
-        dotenv["TEMP_DIR"] ?: "$baseDir/versioning/"
+        dotenv["TEMP_DIR"] ?: "$baseDir/versioning"
     }
 }

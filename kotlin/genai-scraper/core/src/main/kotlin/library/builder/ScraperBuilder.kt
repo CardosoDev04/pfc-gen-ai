@@ -53,14 +53,13 @@ class ScraperBuilder {
     }
 
     fun build(scraperKlass: KClass<*>): Scraper {
-
         return Scraper(
-            modificationDetectionService = modificationDetectionService ?: error("modificationDetectionService not set"),
+            modificationService = modificationDetectionService ?: error("modificationDetectionService not set"),
             snapshotService = snapshotService!!,
             webExtractor = webExtractor ?: error("webExtractor not set"),
             persistenceService = persistenceService ?: error("persistenceService not set"),
             scraperKlass = scraperKlass,
-            retries = retries,
+            maxRetries = retries,
             model = model,
             driver = driver ?: error("driver not set")
         )
