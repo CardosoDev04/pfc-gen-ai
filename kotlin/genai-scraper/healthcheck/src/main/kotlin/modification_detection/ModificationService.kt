@@ -11,10 +11,15 @@ import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
+import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
+import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
 import kotlinx.serialization.encodeToString
+import okhttp3.OkHttpClient
+import ollama.OllamaClient
 
 /**
  * A service for detecting modifications in HTML and updating scraper scripts.
@@ -26,7 +31,10 @@ class ModificationService(
     private val getModificationModel: String,
     private val elementExtractingModel: String
 ) : IModificationService {
-    override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
+    override suspend fun getMissingElements(
+        previousElements: List<Element>,
+        newElements: List<Element>
+    ): List<Element> {
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
                 previousElement.cssSelector == newElement.cssSelector && previousElement.id == newElement.id && previousElement.label == newElement.label
@@ -57,15 +65,30 @@ class ModificationService(
         return Modification(modifiedElement, alternativeElement)
     }
 
-    override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
-        val cssSelector = CssSelector( modification.old.id , modification.old.cssSelector, modification.new.cssSelector, modification.new.id)
+    override suspend fun modifyMistralScript(
+        oldScript: String,
+        modification: Modification<Element>,
+        modelName: String,
+        systemPrompt: String
+    ): String {
+        val cssSelector = CssSelector(
+            modification.old.id,
+            modification.old.cssSelector,
+            modification.new.cssSelector,
+            modification.new.id
+        )
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
         return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
     }
 
-    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
+    override suspend fun modifyScriptChatHistory(
+        oldScript: String,
+        modifications: List<Modification<Element>>,
+        modelName: String,
+        systemPrompt: String
+    ): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
 
@@ -79,7 +102,12 @@ class ModificationService(
         return getModifiedScript(modelName, messages)
     }
 
-    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
+    override suspend fun modifyScriptChatHistory(
+        oldScript: String,
+        modifications: List<Modification<Element>>,
+        modelName: String,
+        messages: List<Message>
+    ): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
 
@@ -90,18 +118,43 @@ class ModificationService(
         return getModifiedScript(modelName, updatedMessages)
     }
 
-    override suspend fun getElementsFromScript(scraperCode: String, system: String, prompt: String): List<Element> {
-        val ollamaGenerateRequest = OllamaGenerateRequest(
+    override suspend fun getElementsFromScript(
+        scraperCode: String,
+        newElements: List<Element>,
+        system: String,
+        prompt: List<Message>
+    ): List<Element> {
+        val ollamaChatRequest = OllamaChatRequest(
             model = elementExtractingModel,
-            system = system,
-            prompt = prompt,
             stream = false,
             raw = false,
+            messages = prompt
+        )
+        val message = Message(
+            role = "user",
+            content = """
+        <script>
+        $scraperCode
+        </script>
+        ```json
+        [
+            ${
+                newElements.joinToString(",\n") {
+                    """{"type": "${it.type}", "cssSelector": "${it.cssSelector}", "id": "${it.id}", "text": "${it.label}"}"""
+                }
+            }
+        ]
+        ```
+    """.trimIndent()
         )
 
-        val ollamaGenerateResponse = llmClient.generate(ollamaGenerateRequest)
+        val ollamaChatResponse = llmClient.chat(ollamaChatRequest.copy(messages = ollamaChatRequest.messages + message))
 
-        // TODO("Find which response format is best and parse it")
+        val messageContent = ollamaChatResponse.message.content
+
+        if (messageContent.isNotBlank()) {
+            return Json.decodeFromString(ListSerializer(Element.serializer()), messageContent)
+        }
         return listOf()
     }
 
@@ -116,7 +169,11 @@ class ModificationService(
         return llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
     }
 
-    private suspend fun modifyScriptUnitary(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
+    private suspend fun modifyScriptUnitary(
+        scraperUpdateRequest: ScraperUpdateRequest,
+        modelName: String,
+        systemPrompt: String
+    ): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = modelName,
             system = systemPrompt,
@@ -133,7 +190,7 @@ class ModificationService(
     }
 
     private fun String.cleanUpdateScriptResponseJson(): String {
-         val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
+        val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
 
         val matchResult = regex.find(this)
         val code = matchResult?.groups?.get(1)?.value
@@ -154,5 +211,50 @@ class ModificationService(
         val matchResult = regex.find(this)
         return matchResult?.groups?.get(1)?.value
             ?: throw IllegalArgumentException("No alternative found in the response")
+    }
+}
+
+fun main() {
+    val httpClient = OkHttpClient()
+    val llmClient = OllamaClient(httpClient)
+    val modificationService = ModificationService(
+        llmClient = llmClient,
+        getModificationModel = "mistral:7b",
+        elementExtractingModel = "mistral:7b"
+    )
+
+    val oldScript = """
+        package scraper
+
+        import classes.data.BookingOption
+        import interfaces.IScraper
+        import org.openqa.selenium.By
+        import org.openqa.selenium.WebDriver
+        import org.openqa.selenium.support.ui.ExpectedConditions
+        import org.openqa.selenium.support.ui.WebDriverWait
+        import snapshots.ISnapshotService
+        import java.time.Duration
+
+        class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
+            override suspend fun scrape(): List<BookingOption> {
+                driver.get("http://localhost:5173/")
+                WebDriverWait(driver, Duration.ofSeconds(5))
+                    .until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
+                snapshotService.takeSnapshotAsFile(driver)
+
+                val optionElements = WebDriverWait(driver, Duration.ofSeconds(5))
+                    .until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
+                snapshotService.takeSnapshotAsFile(driver)
+
+                return optionElements.map { BookingOption(it.text) }
+            }
+        }
+    """.trimIndent()
+
+    val newElements = emptyList<Element>()
+
+    runBlocking {
+        val missing = modificationService.getElementsFromScript(oldScript, newElements, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
+        println("Missing elements: $missing")
     }
 }

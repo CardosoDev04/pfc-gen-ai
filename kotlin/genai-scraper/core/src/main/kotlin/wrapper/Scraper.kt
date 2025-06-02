@@ -9,6 +9,9 @@ import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
 import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
+import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
+import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
+import domain.prompts.GET_MISSING_ELEMENTS_USER_PROMPT
 import enums.ScraperCorrectionResult
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -82,7 +85,6 @@ class Scraper(
                 return attemptCorrectingScraper()
             }
 
-            snapshotService.takeSnapshotAsFile(driver); TODO("Why?")
             throw e
         }
     }
@@ -189,7 +191,7 @@ class Scraper(
          */
 
         // TODO("Create system and prompt for getElementsFromScript")
-        val scriptElements = modificationService.getElementsFromScript(scraperCode, "", "")
+        val scriptElements = modificationService.getElementsFromScript(scraperCode, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
 
         return scriptElements.filter { !htmlElements.contains(it) }
     }

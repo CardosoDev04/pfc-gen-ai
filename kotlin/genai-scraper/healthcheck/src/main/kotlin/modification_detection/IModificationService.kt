@@ -62,5 +62,5 @@ interface IModificationService {
      * @param prompt The prompt to use
      * @return The list of elements of the script
      */
-    suspend fun getElementsFromScript(scraperCode: String, system: String, prompt: String): List<Element>
+    suspend fun getElementsFromScript(scraperCode: String, newElements: List<Element>, system: String, prompt: List<Message>): List<Element>
 }
