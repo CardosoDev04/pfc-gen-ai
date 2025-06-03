@@ -96,7 +96,11 @@ class Scraper(
         val scraperPath = "$stableScraperBaseDir/${scraperKlass.simpleName}.kt"
         val scraperCode = persistenceService.read(scraperPath)
         persistenceService.write("$latestScraperBaseDir/${scraperKlass.simpleName}.kt", scraperCode)
-        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt")
+        val compilationResult = compileAndInstantiateScraper(
+            scraperKlass,
+            scraperPath,
+            "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt"
+        )
         return compilationResult.scraperInstance
     }
 
@@ -133,34 +137,47 @@ class Scraper(
          *          - Use test run scraper code and snapshots to try and correct the scraper again
          *      - Otherwise
          *          - Revert to the last correction result if there is any, otherwise, revert to the original code and retry
-        */
+         */
 
         val (scraperCode, htmlCode) = getHtmlAndScraperCode()
         val htmlElements = webExtractor.getRelevantHTMLElements(htmlCode)
         val notPresent = getMissingElements(scraperCode, htmlElements)
         // val alternativeElements = missingElements.map { getAlternative(it, htmlElements) }
 
-        val newScript = modificationService.modifyScriptChatHistoryV2(scraperCode, notPresent, model.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
+        val newScript = modificationService.modifyScriptChatHistoryV2(
+            scraperCode,
+            notPresent,
+            model.modelName,
+            FEW_SHOT_SCRAPER_UPDATE_MESSAGES
+        )
 
         val newScraperPath = "$testScraperBaseDir/${scraperKlass.simpleName}.kt"
-        val changedPackageScript = newScript.replaceFirstLine("package snapshots.${scraperKlass.simpleName}.test.scraper")
+        val newTestPath = "$testScraperBaseDir/${scraperKlass.simpleName}Test.kt"
+        val changedPackageScript =
+            newScript.replaceFirstLine("package snapshots.${scraperKlass.simpleName}.test.scraper")
 
+        val testFileContent = persistenceService.read("$stableBaseDir/scraper/${scraperKlass.simpleName}Test.kt")
+        val newTestFileContent =
+            testFileContent.replaceFirstLine("package snapshots.${scraperKlass.simpleName}.test.scraper")
+
+        persistenceService.write(newTestPath, newTestFileContent)
         persistenceService.write(newScraperPath, changedPackageScript)
 
         val scraperCompilationResult = compileAndInstantiateScraper(
             scraperKlass,
             newScraperPath,
-            "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt"
+            newTestPath
         )
 
-        val testResult = testScraper(scraperCompilationResult.scraperInstance)
+        val testResult = testScraper(scraperCompilationResult)
 
         when (testResult) {
-            is ScraperCorrectionResult.Failure -> { }
+            is ScraperCorrectionResult.Failure -> {}
             is ScraperCorrectionResult.PartialFix -> {
                 val stepsAchieved = testResult.stepsAchieved
                 scraperCorrectionHistory.add(ScraperCorrection(newScript, stepsAchieved))
             }
+
             is ScraperCorrectionResult.Success -> {
                 persistScraper(newScript)
             }
@@ -189,10 +206,18 @@ class Scraper(
     }
 
     private suspend fun getMissingElements(scraperCode: String, htmlElements: List<Element>): List<Element> {
-        return modificationService.getMissingElementsFromScript(scraperCode, htmlElements, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
+        return modificationService.getMissingElementsFromScript(
+            scraperCode,
+            htmlElements,
+            GET_MISSING_ELEMENTS_SYSTEM_PROMPT,
+            GET_MISSING_ELEMENTS_MESSAGES
+        )
     }
 
-    private suspend fun getAlternative(missingElement: Element, htmlRelevantElements: List<Element>): Modification<Element> {
+    private suspend fun getAlternative(
+        missingElement: Element,
+        htmlRelevantElements: List<Element>
+    ): Modification<Element> {
         /**
          * Use an LLM to find the best alternative given the missing elements and the new relevant elements from the html
          */
@@ -206,7 +231,11 @@ class Scraper(
      * @param scraperCodePath The path to the scraper code file.
      * @return CompiledScraperResult containing the instantiated scraper and test classes.
      */
-    private fun compileAndInstantiateScraper(scraperKlass: KClass<*>, scraperCodePath: String, testFilePath: String ): CompiledScraperResult {
+    private fun compileAndInstantiateScraper(
+        scraperKlass: KClass<*>,
+        scraperCodePath: String,
+        testFilePath: String
+    ): CompiledScraperResult {
         val className = scraperKlass.simpleName!!
         val scraperFile = File(scraperCodePath)
         val scraperDir = scraperFile.parentFile
@@ -234,14 +263,15 @@ class Scraper(
         return compileResult
     }
 
-    private fun testScraper(scraper: IScraper): ScraperCorrectionResult {
+    private fun testScraper(scraperResult: CompiledScraperResult): ScraperCorrectionResult {
         println("Testing scraper...")
 
-        getSetUpMethods(scraper::class)
-            .forEach { it.invoke(scraper) }
+        val testInstance = scraperResult.testInstance
+        val testClass = testInstance::class
 
-        // Run all tests from the test class
-        val testMethods = scraper::class.java.methods.filter {
+        getSetUpMethods(testClass).forEach { it.invoke(testInstance) }
+
+        val testMethods = testClass.java.methods.filter {
             it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
         }
 
@@ -250,7 +280,7 @@ class Scraper(
         for (method in testMethods) {
             try {
                 println("Running test: ${method.name}")
-                method.invoke(scraper)
+                method.invoke(testInstance)
             } catch (e: Exception) {
                 failedTests++
                 println("Test failed: ${method.name}")
@@ -259,8 +289,7 @@ class Scraper(
             }
         }
 
-        getTearDownMethods(scraper::class)
-            .forEach { it.invoke(scraper) }
+        getTearDownMethods(testClass).forEach { it.invoke(testInstance) }
 
         if (failedTests > 0) {
             val (lastRunSteps, currentRunSteps) = getStepsAchieved()
@@ -272,7 +301,7 @@ class Scraper(
             return ScraperCorrectionResult.Failure
         }
 
-        return ScraperCorrectionResult.Success(scraper)
+        return ScraperCorrectionResult.Success(scraperResult.scraperInstance)
     }
 
     private fun getTearDownMethods(clazz: KClass<*>): List<Method> =

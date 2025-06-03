@@ -19,7 +19,7 @@ class IsolatedClassLoader(urls: Array<URL>, parent: ClassLoader) : URLClassLoade
             if (resolve) resolveClass(loaded)
             return loaded
         }
-        return super.loadClass(name, resolve)
+       return super.loadClass(name, resolve)
     }
 }
 

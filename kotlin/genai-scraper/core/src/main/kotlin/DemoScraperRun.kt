@@ -27,7 +27,7 @@ fun main() {
         val modificationDetectionService = ModificationService(llmClient, LLM.Gemma3_4B.modelName, LLM.Mistral7B.modelName)
 
         val scraper = ScraperBuilder()
-            .withModel(LLM.CodeLlama7B)
+            .withModel(LLM.Mistral7B)
             .withRetries(3)
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
