@@ -17,7 +17,7 @@ class SnapshotService(private val className: String): ISnapshotService {
 
     // Clear the snapshots directory
     init {
-        val snapshotsDir = File(Configurations.snapshotBaseDir + "$className/latest")
+        val snapshotsDir = File("${Configurations.snapshotBaseDir}/$className/latest")
         if (!snapshotsDir.exists() || !snapshotsDir.isDirectory) {
             throw IllegalStateException("Snapshots directory for $className not found")
         }

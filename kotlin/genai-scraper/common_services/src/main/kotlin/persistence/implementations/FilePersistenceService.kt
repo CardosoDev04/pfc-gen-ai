@@ -16,6 +16,10 @@ class FilePersistenceService(
 ) : PersistenceService {
     override fun write(filePath: String, content: String) {
         val file = File(filePath)
+        if (!file.exists()) {
+            file.parentFile?.mkdirs()
+            file.createNewFile()
+        }
         file.writeText(content)
     }
 

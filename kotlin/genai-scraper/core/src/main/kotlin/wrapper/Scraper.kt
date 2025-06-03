@@ -69,7 +69,10 @@ class Scraper(
 
         try {
             return scraperInstance.scrape()
-                .also { persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir) }
+                .also {
+                    persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir)
+                    persistenceService.deleteSubDirectories(latestBaseDir)
+                }
         } catch (e: Exception) {
             val seleniumExceptionTypes = setOf(
                 NoSuchElementException::class,
