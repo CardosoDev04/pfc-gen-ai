@@ -11,7 +11,6 @@ import domain.model.interfaces.IScraperWrapper
 import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
 import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
 import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
-import domain.prompts.GET_MISSING_ELEMENTS_USER_PROMPT
 import enums.ScraperCorrectionResult
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -184,16 +183,7 @@ class Scraper(
     }
 
     private suspend fun getMissingElements(scraperCode: String, htmlElements: List<Element>): List<Element> {
-        /**
-         * Get selected elements information from scraper code using an LLM
-         * Get relevant elements from htmlSnapshot
-         * Return elements that are in the scraper code and not in the html relevant elements
-         */
-
-        // TODO("Create system and prompt for getElementsFromScript")
-        val scriptElements = modificationService.getElementsFromScript(scraperCode, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
-
-        return scriptElements.filter { !htmlElements.contains(it) }
+        return modificationService.getMissingElementsFromScript(scraperCode, htmlElements, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
     }
 
     private suspend fun getAlternative(missingElement: Element, htmlRelevantElements: List<Element>): Modification<Element> {

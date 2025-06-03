@@ -1,7 +1,6 @@
 package modification_detection
 
 import classes.data.Element
-import classes.llm.LLM
 import classes.llm.Message
 import classes.service_model.CssSelector
 import classes.service_model.Modification
@@ -11,15 +10,10 @@ import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
-import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
-import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
-import kotlinx.serialization.encodeToString
-import okhttp3.OkHttpClient
-import ollama.OllamaClient
 
 /**
  * A service for detecting modifications in HTML and updating scraper scripts.
@@ -118,7 +112,7 @@ class ModificationService(
         return getModifiedScript(modelName, updatedMessages)
     }
 
-    override suspend fun getElementsFromScript(
+    override suspend fun getMissingElementsFromScript(
         scraperCode: String,
         newElements: List<Element>,
         system: String,
@@ -211,50 +205,5 @@ class ModificationService(
         val matchResult = regex.find(this)
         return matchResult?.groups?.get(1)?.value
             ?: throw IllegalArgumentException("No alternative found in the response")
-    }
-}
-
-fun main() {
-    val httpClient = OkHttpClient()
-    val llmClient = OllamaClient(httpClient)
-    val modificationService = ModificationService(
-        llmClient = llmClient,
-        getModificationModel = "mistral:7b",
-        elementExtractingModel = "mistral:7b"
-    )
-
-    val oldScript = """
-        package scraper
-
-        import classes.data.BookingOption
-        import interfaces.IScraper
-        import org.openqa.selenium.By
-        import org.openqa.selenium.WebDriver
-        import org.openqa.selenium.support.ui.ExpectedConditions
-        import org.openqa.selenium.support.ui.WebDriverWait
-        import snapshots.ISnapshotService
-        import java.time.Duration
-
-        class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
-            override suspend fun scrape(): List<BookingOption> {
-                driver.get("http://localhost:5173/")
-                WebDriverWait(driver, Duration.ofSeconds(5))
-                    .until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
-                snapshotService.takeSnapshotAsFile(driver)
-
-                val optionElements = WebDriverWait(driver, Duration.ofSeconds(5))
-                    .until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
-                snapshotService.takeSnapshotAsFile(driver)
-
-                return optionElements.map { BookingOption(it.text) }
-            }
-        }
-    """.trimIndent()
-
-    val newElements = emptyList<Element>()
-
-    runBlocking {
-        val missing = modificationService.getElementsFromScript(oldScript, newElements, GET_MISSING_ELEMENTS_SYSTEM_PROMPT, GET_MISSING_ELEMENTS_MESSAGES)
-        println("Missing elements: $missing")
     }
 }
