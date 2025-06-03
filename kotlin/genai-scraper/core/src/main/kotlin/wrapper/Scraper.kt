@@ -22,6 +22,7 @@ import java.io.File
 import java.lang.reflect.Method
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
+import Utils.replaceFirstLine
 
 class Scraper(
     private val modificationService: IModificationService,
@@ -95,7 +96,7 @@ class Scraper(
         val scraperPath = "$stableScraperBaseDir/${scraperKlass.simpleName}.kt"
         val scraperCode = persistenceService.read(scraperPath)
         persistenceService.write("$latestScraperBaseDir/${scraperKlass.simpleName}.kt", scraperCode)
-        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt")
+        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$testBaseDir/${scraperKlass.simpleName}Test.kt")
         return compilationResult.scraperInstance
     }
 
@@ -136,13 +137,15 @@ class Scraper(
 
         val (scraperCode, htmlCode) = getHtmlAndScraperCode()
         val htmlElements = webExtractor.getRelevantHTMLElements(htmlCode)
-        val missingElements = getMissingElements(scraperCode, htmlElements)
-        val alternativeElements = missingElements.map { getAlternative(it, htmlElements) }
+        val notPresent = getMissingElements(scraperCode, htmlElements)
+        // val alternativeElements = missingElements.map { getAlternative(it, htmlElements) }
 
-        val newScript = modificationService.modifyScriptChatHistory(scraperCode, alternativeElements, model.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
+        val newScript = modificationService.modifyScriptChatHistoryV2(scraperCode, notPresent, model.modelName, FEW_SHOT_SCRAPER_UPDATE_MESSAGES)
 
-        val newScraperPath = "$testScraperBaseDir/${scraperKlass.simpleName}"
-        persistenceService.write(newScraperPath, newScript)
+        val newScraperPath = "$testScraperBaseDir/${scraperKlass.simpleName}.kt"
+        val changedPackageScript = newScript.replaceFirstLine("package snapshots.${scraperKlass.simpleName}.test.scraper")
+
+        persistenceService.write(newScraperPath, changedPackageScript)
 
         val scraperCompilationResult = compileAndInstantiateScraper(
             scraperKlass,

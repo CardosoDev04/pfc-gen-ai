@@ -55,6 +55,17 @@ interface IModificationService {
     suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String
 
     /**
+     * Modified the script based on a list of missing elements using a chat history.
+     *
+     * @param oldScript The old script.
+     * @param missingElements The list of missing elements to apply.
+     * @param modelName The name of the model to use.
+     * @param messages The messages simulating a conversation.
+     * @return The modified script.
+     */
+    suspend fun modifyScriptChatHistoryV2(oldScript: String, missingElements: List<Element>, modelName: String, messages: List<Message>): String
+
+    /**
      * Get elements interacted with in the scraper that are not present in the new HTML state.
      *
      * @param scraperCode The script to extract the elements from

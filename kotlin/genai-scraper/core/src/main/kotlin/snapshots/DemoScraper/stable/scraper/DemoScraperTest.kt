@@ -1,10 +1,11 @@
-package scraper
+package snapshots.DemoScraper.stable.scraper
 
 import com.cardoso.common.buildChromeDriver
 import interfaces.IScraper
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.openqa.selenium.WebDriver
+import scraper.DemoScraper
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DemoScraperTest(val scraper: IScraper) {

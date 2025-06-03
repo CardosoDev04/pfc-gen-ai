@@ -8,6 +8,7 @@ import domain.http.ollama.requests.OllamaChatRequest
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
+import domain.modification.requests.ScraperUpdateRequestV2
 import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
 import kotlinx.serialization.builtins.ListSerializer
@@ -110,6 +111,28 @@ class ModificationService(
         val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
 
         return getModifiedScript(modelName, updatedMessages)
+    }
+
+    override suspend fun modifyScriptChatHistoryV2(
+        oldScript: String,
+        missingElements: List<Element>,
+        modelName: String,
+        messages: List<Message>
+    ): String {
+        val imports = getImports(oldScript)
+
+        val request = ScraperUpdateRequestV2(
+            imports = imports,
+            script = oldScript,
+            newElements = missingElements
+        )
+
+        val updatedMessage = messages + Message(
+            role = "user",
+            content = Json.encodeToString(request)
+        )
+
+        return getModifiedScript(modelName, updatedMessage)
     }
 
     override suspend fun getMissingElementsFromScript(
