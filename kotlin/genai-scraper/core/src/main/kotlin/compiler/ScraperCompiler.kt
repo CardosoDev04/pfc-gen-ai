@@ -14,7 +14,7 @@ data class CompiledScraperResult(
 
 class IsolatedClassLoader(urls: Array<URL>, parent: ClassLoader) : URLClassLoader(urls, parent) {
     override fun loadClass(name: String, resolve: Boolean): Class<*> {
-        if (name.startsWith("scraper.") || name.startsWith("scrapers.")) {
+        if (name.startsWith("scraper.")) {
             val loaded = findLoadedClass(name) ?: findClass(name)
             if (resolve) resolveClass(loaded)
             return loaded
@@ -41,7 +41,7 @@ object ScraperCompiler {
 
             outputDir.mkdirs()
 
-            val allSourceFiles = (scraperSourceDir.walkTopDown() + testSourceDir.walkTopDown())
+            val allSourceFiles = (scraperSourceDir.walkTopDown())
                 .filter { it.extension == "kt" }
                 .toList()
 

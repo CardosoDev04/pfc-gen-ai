@@ -26,7 +26,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
 
             snapshotService.takeSnapshotAsFile(driver)
 
-            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector("#item-title")))
+            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
             StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver)
