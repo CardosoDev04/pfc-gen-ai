@@ -21,7 +21,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
             driver.get("http://localhost:5173/")
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#search-btn"))).click() // Changed from "#search-button" to "#search-btn"
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("#search-button"))).click()
             StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver)

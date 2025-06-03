@@ -96,7 +96,7 @@ class Scraper(
         val scraperPath = "$stableScraperBaseDir/${scraperKlass.simpleName}.kt"
         val scraperCode = persistenceService.read(scraperPath)
         persistenceService.write("$latestScraperBaseDir/${scraperKlass.simpleName}.kt", scraperCode)
-        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$testBaseDir/${scraperKlass.simpleName}Test.kt")
+        val compilationResult = compileAndInstantiateScraper(scraperKlass, scraperPath, "$stableScraperBaseDir/${scraperKlass.simpleName}Test.kt")
         return compilationResult.scraperInstance
     }
 

@@ -1,4 +1,4 @@
-package snapshots.DemoScraper.stable.scraper
+package scraper
 
 import com.cardoso.common.buildChromeDriver
 import interfaces.IScraper
