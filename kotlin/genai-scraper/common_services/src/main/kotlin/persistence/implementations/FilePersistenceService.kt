@@ -54,14 +54,12 @@ class FilePersistenceService(
         copyRecursively(sourceDir, destDir)
     }
 
-    override fun deleteSubDirectories(parentPath: String) {
+    override fun deleteAllContents(parentPath: String) {
         val parentDir = File(parentPath)
         if (!parentDir.exists() || !parentDir.isDirectory) return
 
         parentDir.listFiles()?.forEach { file ->
-            if (file.isDirectory) {
-                file.deleteRecursively()
-            }
+            file.deleteRecursively()
         }
     }
 

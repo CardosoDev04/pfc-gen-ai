@@ -8,7 +8,6 @@ import classes.service_model.Modification
 import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
-import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
 import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
 import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
 import enums.ScraperCorrectionResult
@@ -22,7 +21,6 @@ import java.io.File
 import java.lang.reflect.Method
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
-import Utils.replaceFirstLine
 
 class Scraper(
     private val scraper: IScraper,
@@ -73,7 +71,7 @@ class Scraper(
             return scraper.scrape()
                 .also {
                     persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir)
-                    persistenceService.deleteSubDirectories(latestBaseDir)
+                    persistenceService.deleteAllContents(latestBaseDir)
                 }
         } catch (e: Exception) {
             val seleniumExceptionTypes = setOf(
@@ -103,11 +101,16 @@ class Scraper(
         var retries = 0
 
         while (retries < maxRetries) {
+            snapshotService.resetCounter()
             val correctionResult = correctScraper()
 
             if (correctionResult is ScraperCorrectionResult.Success) {
                 return correctionResult.correctedScraper.scrape()
-                    .also { persistenceService.copyWholeDirectory(latestBaseDir, stableBaseDir) }
+                    .also {
+                        // Clean up latest directory and test directory
+                        persistenceService.deleteAllContents(latestBaseDir)
+                        persistenceService.deleteAllContents(testBaseDir)
+                    }
             } else if (correctionResult is ScraperCorrectionResult.Failure) {
                 retries++
             }
@@ -144,6 +147,7 @@ class Scraper(
 //            model.modelName,
 //            FEW_SHOT_SCRAPER_UPDATE_MESSAGES
 //        )
+
         val newScript = """
             package scraper
             
@@ -160,6 +164,7 @@ class Scraper(
             import steptracker.StepTracker
             import java.time.Duration
             
+            
             class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
                 override suspend fun scrape(): List<BookingOption> {
                     try {
@@ -168,15 +173,14 @@ class Scraper(
                         val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
                         driver.get("http://localhost:5173/")
             
-                        webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-btn")))
+                        snapshotService.takeSnapshotAsFile(driver)
+                        val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-btn")))
+                        searchButton.click()
                         StepTracker.incrementStep(identifier)
             
                         snapshotService.takeSnapshotAsFile(driver)
-            
                         val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
                         StepTracker.incrementStep(identifier)
-            
-                        snapshotService.takeSnapshotAsFile(driver)
             
                         val results = optionElements.map { BookingOption(it.text) }
             
@@ -216,9 +220,8 @@ class Scraper(
                 val stepsAchieved = testResult.stepsAchieved
                 scraperCorrectionHistory.add(ScraperCorrection(newScript, stepsAchieved))
             }
-
             is ScraperCorrectionResult.Success -> {
-                persistScraper(newScript)
+                persistScraper()
             }
         }
 
@@ -232,14 +235,7 @@ class Scraper(
          * - Otherwise
          *      - Get html from test directory and last correction result scraper code
          */
-
-        /*
-        val latestStepDir = persistenceService.findLastCreatedDirectory("$latestBaseDir/steps")
-                ?: throw IllegalStateException("Latest steps directory not found")
-
-            return Pair(latestStepDir.name.toInt(), testStepDir.name.toInt())
-         */
-        val lastAchievedStep = persistenceService.findLastCreatedDirectory("$latestBaseDir/steps")?.name?.toInt()
+        val lastAchievedStep = persistenceService.findLastCreatedDirectory("$testBaseDir/steps")?.name?.toInt()
             ?: throw IllegalStateException("Latest steps directory not found")
 
         if (scraperCorrectionHistory.isEmpty()) {
@@ -249,7 +245,7 @@ class Scraper(
         }
 
         val scraperCode = scraperCorrectionHistory.last().code
-        val htmlCode = persistenceService.read("$testHtmlBaseDirPath/index.html")
+        val htmlCode = persistenceService.read("$testHtmlBaseDirPath/$lastAchievedStep/index.html")
 
         return Pair(scraperCode, htmlCode)
     }
@@ -383,7 +379,8 @@ class Scraper(
         return Pair(scraperCorrectionHistory.last().stepsAchieved, testStepDir.name.toInt())
     }
 
-    private fun persistScraper(newScript: String) {
-        persistenceService.write("$stableScraperBaseDir/${scraperKlass.simpleName}.kt", newScript)
+    private fun persistScraper() {
+        persistenceService.copyWholeDirectory(testScraperBaseDir, stableScraperBaseDir)
+        persistenceService.deleteAllContents(testBaseDir)
     }
 }

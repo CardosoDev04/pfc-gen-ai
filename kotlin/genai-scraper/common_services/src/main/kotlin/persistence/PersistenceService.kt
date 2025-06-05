@@ -38,7 +38,7 @@ interface PersistenceService {
 
     fun copyWholeDirectory(from: String, to: String)
 
-    fun deleteSubDirectories(parentPath: String)
+    fun deleteAllContents(parentPath: String)
 
     fun findLastCreatedDirectory(directoryPath: String): File?
 }

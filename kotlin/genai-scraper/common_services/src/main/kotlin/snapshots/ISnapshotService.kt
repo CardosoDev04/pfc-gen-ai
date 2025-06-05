@@ -2,7 +2,6 @@ package snapshots
 
 import classes.service_model.Snapshot
 import org.openqa.selenium.WebDriver
-import java.io.File
 
 interface ISnapshotService {
     var isFirstRun: Boolean
@@ -13,7 +12,7 @@ interface ISnapshotService {
      * @param driver The WebDriver instance used to take the snapshot.
      * @return The file containing the snapshot.
      */
-    fun takeSnapshotAsFile(driver: WebDriver): File
+    fun takeSnapshotAsFile(driver: WebDriver)
 
     /**
      * Retrieves a snapshot from the given HTML file path.
@@ -22,4 +21,6 @@ interface ISnapshotService {
      * @return The Snapshot object containing the HTML file.
      */
     fun getSnapshot(htmlPath: String): Snapshot
+
+    fun resetCounter()
 }

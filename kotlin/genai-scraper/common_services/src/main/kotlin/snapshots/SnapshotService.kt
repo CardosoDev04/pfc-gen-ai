@@ -25,11 +25,11 @@ class SnapshotService(private val className: String): ISnapshotService {
         snapshotsDir.listFiles()?.forEach { it.deleteRecursively() }
     }
 
-    override fun takeSnapshotAsFile(driver: WebDriver): File {
-        val basePath = if (isFirstRun){
+    override fun takeSnapshotAsFile(driver: WebDriver) {
+        val basePath = if (isFirstRun) {
             Configurations.snapshotBaseDir + "/$className/latest/steps/$currentStepN"
         } else {
-            Configurations.snapshotBaseDir + "/$className/test"
+            Configurations.snapshotBaseDir + "/$className/test/steps/$currentStepN"
         }
 
         val htmlPath = "$basePath/html"
@@ -44,12 +44,14 @@ class SnapshotService(private val className: String): ISnapshotService {
         driver.pageSource?.let { htmlFile.writeText(it) }
 
         currentStepN++
-
-        return destFile
     }
 
     override fun getSnapshot(htmlPath: String): Snapshot {
         val htmlFile = File(htmlPath)
         return Snapshot(htmlFile)
+    }
+
+    override fun resetCounter() {
+        currentStepN = 1
     }
 }
