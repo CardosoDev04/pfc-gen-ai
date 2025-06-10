@@ -1,13 +1,11 @@
 package compiler
 
-import Configurations
 import interfaces.IScraper
 import org.openqa.selenium.WebDriver
 import snapshots.ISnapshotService
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
-import java.time.LocalDateTime
 
 data class CompiledScraperResult(
     val scraperInstance: IScraper,
@@ -16,89 +14,78 @@ data class CompiledScraperResult(
 
 class IsolatedClassLoader(urls: Array<URL>, parent: ClassLoader) : URLClassLoader(urls, parent) {
     override fun loadClass(name: String, resolve: Boolean): Class<*> {
-        if (name.startsWith("scrapers.")) {
+        if (name.startsWith("scraper.")) {
             val loaded = findLoadedClass(name) ?: findClass(name)
             if (resolve) resolveClass(loaded)
             return loaded
         }
-        return super.loadClass(name, resolve)
+       return super.loadClass(name, resolve)
     }
 }
 
-
 object ScraperCompiler {
+
     fun attemptToCompileAndInstantiate(
         scraperName: String,
-        newScraperCode: String,
+        scraperSourceDir: File,
+        testSourceDir: File,
+        outputDir: File,
         driver: WebDriver,
-        snapshotService: ISnapshotService,
-        testClassName: String
+        snapshotService: ISnapshotService
     ): CompiledScraperResult? {
         return try {
-            val srcDir = File(Configurations.versioningBaseDir + "src/${scraperName}_${LocalDateTime.now()}")
-            srcDir.mkdirs()
-
-            // Create scraper file
-            val newScraperFile = File(srcDir, "$scraperName.kt")
-            newScraperFile.writeText(newScraperCode)
-
-            // Copy test file from static location into srcDir
-            val testFileName = "$testClassName.kt"
-            val existingTestFile = File(Configurations.scrapersBaseDir, testFileName)
-
-            if (!existingTestFile.exists()) {
-                println("Test file not found at ${existingTestFile.absolutePath}")
+            if (!scraperSourceDir.exists() || !testSourceDir.exists()) {
+                println("Source directories not found")
                 return null
             }
 
-            val destTestFile = File(srcDir, testFileName)
-            existingTestFile.copyTo(destTestFile, overwrite = true)
+            outputDir.mkdirs()
 
-            val compiledDir = File(Configurations.versioningBaseDir + "out/${scraperName}_${LocalDateTime.now()}")
-            compiledDir.mkdirs()
-            val isScraperCompileSuccess = compileKotlin(srcDir, compiledDir)
+            val allSourceFiles = (scraperSourceDir.walkTopDown())
+                .filter { it.extension == "kt" }
+                .toList()
 
-            if (!isScraperCompileSuccess) {
-                println("Dynamic scraper compilation failed")
+            if (allSourceFiles.isEmpty()) {
+                println("No Kotlin source files to compile.")
                 return null
             }
 
-            val classLoader = IsolatedClassLoader(arrayOf(compiledDir.toURI().toURL()), javaClass.classLoader)
+            val compileSuccess = compileKotlin(allSourceFiles, outputDir)
+            if (!compileSuccess) {
+                println("Dynamic scraper/test compilation failed")
+                return null
+            }
 
-            val scraperClass = classLoader.loadClass("scrapers.${scraperName}")
+            val classLoader = IsolatedClassLoader(arrayOf(outputDir.toURI().toURL()), javaClass.classLoader)
+
+            val scraperClass = classLoader.loadClass("scraper.$scraperName")
             val scraperInstance = scraperClass
                 .getDeclaredConstructor(WebDriver::class.java, ISnapshotService::class.java)
                 .newInstance(driver, snapshotService) as IScraper
 
-            val testClass = classLoader.loadClass("scrapers.$testClassName")
+            val testClassName = testSourceDir.walkTopDown()
+                .firstOrNull { it.extension == "kt" }
+                ?.nameWithoutExtension
+                ?: return null
+
+            val testClass = classLoader.loadClass("scraper.$testClassName")
             val testInstance = testClass
-               // .also { classLoader.close() }
                 .getDeclaredConstructor(IScraper::class.java)
                 .newInstance(scraperInstance)
 
             CompiledScraperResult(scraperInstance, testInstance)
         } catch (e: Exception) {
-            println("Compilation of the new scraper failed")
+            println("Compilation or instantiation failed:")
             e.printStackTrace()
             null
         }
     }
 
     private fun compileKotlin(
-        sourceDir: File,
+        sourceFiles: List<File>,
         outputDir: File,
         kotlincPath: String = "kotlinc"
     ): Boolean {
-        val sourceFiles = sourceDir.walkTopDown()
-            .filter { it.extension == "kt" }
-            .map { it.absolutePath }
-            .toList()
-
-        if (sourceFiles.isEmpty()) {
-            println("No Kotlin source files to compile.")
-            return false
-        }
-
         val process = ProcessBuilder().apply {
             command(
                 kotlincPath,
@@ -106,7 +93,7 @@ object ScraperCompiler {
                 "-no-stdlib",
                 "-no-reflect",
                 "-cp", System.getProperty("java.class.path"),
-                *sourceFiles.toTypedArray()
+                *sourceFiles.map { it.absolutePath }.toTypedArray()
             )
             inheritIO()
         }.start()
@@ -115,5 +102,4 @@ object ScraperCompiler {
         println("kotlinc exited with $exitCode")
         return exitCode == 0
     }
-
 }

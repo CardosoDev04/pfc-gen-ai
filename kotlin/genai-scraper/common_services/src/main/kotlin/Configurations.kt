@@ -7,15 +7,11 @@ object Configurations {
         dotenv["BASE_DIR"] ?: System.getProperty("user.dir")
     }
 
-    val scrapersBaseDir: String by lazy {
-        dotenv["SCRAPERS_DIR"] ?: "$baseDir/scrapers/src/main/kotlin/scrapers/"
-    }
-
     val snapshotBaseDir: String by lazy {
-        dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots/"
+        dotenv["SNAPSHOTS_DIR"] ?: "$baseDir/core/src/main/kotlin/snapshots"
     }
 
     val versioningBaseDir: String by lazy {
-        dotenv["TEMP_DIR"] ?: "$baseDir/versioning/"
+        dotenv["TEMP_DIR"] ?: "$baseDir/versioning"
     }
 }

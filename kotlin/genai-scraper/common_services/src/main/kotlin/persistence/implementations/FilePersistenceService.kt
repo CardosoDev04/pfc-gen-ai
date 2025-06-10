@@ -16,6 +16,10 @@ class FilePersistenceService(
 ) : PersistenceService {
     override fun write(filePath: String, content: String) {
         val file = File(filePath)
+        if (!file.exists()) {
+            file.parentFile?.mkdirs()
+            file.createNewFile()
+        }
         file.writeText(content)
     }
 
@@ -48,6 +52,24 @@ class FilePersistenceService(
         if (!sourceDir.exists() || !sourceDir.isDirectory) return
 
         copyRecursively(sourceDir, destDir)
+    }
+
+    override fun deleteAllContents(parentPath: String) {
+        val parentDir = File(parentPath)
+        if (!parentDir.exists() || !parentDir.isDirectory) return
+
+        parentDir.listFiles()?.forEach { file ->
+            file.deleteRecursively()
+        }
+    }
+
+    override fun findLastCreatedDirectory(directoryPath: String): File? {
+        val directory = File(directoryPath)
+        if (!directory.exists() || !directory.isDirectory) {
+            throw IllegalArgumentException("The provided path is not a valid directory")
+        }
+
+        return directory.listFiles { file -> file.isDirectory }?.maxByOrNull { it.lastModified() }
     }
 
     private fun copyRecursively(src: File, dst: File) {

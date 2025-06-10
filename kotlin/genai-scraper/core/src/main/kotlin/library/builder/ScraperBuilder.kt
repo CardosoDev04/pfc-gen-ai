@@ -3,15 +3,17 @@ package library.builder
 import classes.llm.LLM
 import html_fetcher.WebExtractor
 import interfaces.IScraper
-import modification_detection.IModificationDetectionService
+import modification_detection.IModificationService
 import org.openqa.selenium.WebDriver
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import wrapper.Scraper
+import kotlin.reflect.KClass
 
 class ScraperBuilder {
 
-    private var modificationDetectionService: IModificationDetectionService? = null
+    private var scraper: IScraper? = null
+    private var modificationDetectionService: IModificationService? = null
     private var snapshotService: ISnapshotService? = null
     private var webExtractor: WebExtractor? = null
     private var persistenceService: PersistenceService? = null
@@ -20,7 +22,11 @@ class ScraperBuilder {
     private var model: LLM = LLM.Mistral7B
     private var driver: WebDriver? = null
 
-    fun withModificationDetectionService(service: IModificationDetectionService) = apply {
+    fun withScraper(scraper: IScraper) = apply {
+        this.scraper = scraper
+    }
+
+    fun withModificationDetectionService(service: IModificationService) = apply {
         this.modificationDetectionService = service
     }
 
@@ -52,19 +58,17 @@ class ScraperBuilder {
         this.driver = driver
     }
 
-    fun build(initialScraper: IScraper): Scraper {
-
+    fun build(scraperKlass: KClass<*>): Scraper {
         return Scraper(
-            modificationDetectionService = modificationDetectionService ?: error("modificationDetectionService not set"),
+            scraper = scraper ?: error("Scraper not set"),
+            modificationService = modificationDetectionService ?: error("ModificationDetectionService not set"),
             snapshotService = snapshotService!!,
-            webExtractor = webExtractor ?: error("webExtractor not set"),
-            persistenceService = persistenceService ?: error("persistenceService not set"),
-            backupScraper = null,
-            scraperTestClassName = scraperTestClassName ?: error("scraperTestClassName not set"),
-            currentScraper = initialScraper,
-            retries = retries,
+            webExtractor = webExtractor ?: error("WebExtractor not set"),
+            persistenceService = persistenceService ?: error("PersistenceService not set"),
+            scraperKlass = scraperKlass,
+            maxRetries = retries,
             model = model,
-            driver = driver ?: error("driver not set")
+            driver = driver ?: error("Driver not set")
         )
     }
 

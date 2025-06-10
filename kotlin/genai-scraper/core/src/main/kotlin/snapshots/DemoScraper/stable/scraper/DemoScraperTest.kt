@@ -1,15 +1,16 @@
-package scrapers
+package scraper
 
 import com.cardoso.common.buildChromeDriver
 import interfaces.IScraper
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.openqa.selenium.WebDriver
+import scraper.DemoScraper
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DemoScraperTest(val scraper: IScraper) {
 
-    private val driver: WebDriver = buildChromeDriver()
+    private val driver: WebDriver = buildChromeDriver(true)
 
     @Test
     fun `scrape should return list of BookingOption from real page`() {

@@ -8,23 +8,28 @@ import domain.http.ollama.requests.OllamaChatRequest
 import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
+import domain.modification.requests.ScraperUpdateRequestV2
 import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ollama.ILLMClient
-import kotlinx.serialization.encodeToString
 
 /**
  * A service for detecting modifications in HTML and updating scraper scripts.
  *
  * @property llmClient The client for interacting with the LLM.
  */
-class ModificationDetectionService(
+class ModificationService(
     private val llmClient: ILLMClient,
-    private val getModificationModel: String
-) : IModificationDetectionService {
-    override suspend fun getMissingElements(previousElements: List<Element>, newElements: List<Element>): List<Element> {
+    private val getModificationModel: String,
+    private val elementExtractingModel: String
+) : IModificationService {
+    override suspend fun getMissingElements(
+        previousElements: List<Element>,
+        newElements: List<Element>
+    ): List<Element> {
         return previousElements.filterNot { previousElement ->
             newElements.any { newElement ->
                 previousElement.cssSelector == newElement.cssSelector && previousElement.id == newElement.id && previousElement.label == newElement.label
@@ -55,15 +60,30 @@ class ModificationDetectionService(
         return Modification(modifiedElement, alternativeElement)
     }
 
-    override suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String {
-        val cssSelector = CssSelector(modification.old.cssSelector, modification.new.cssSelector)
+    override suspend fun modifyMistralScript(
+        oldScript: String,
+        modification: Modification<Element>,
+        modelName: String,
+        systemPrompt: String
+    ): String {
+        val cssSelector = CssSelector(
+            modification.old.id,
+            modification.old.cssSelector,
+            modification.new.cssSelector,
+            modification.new.id
+        )
         val imports = getImports(oldScript)
         val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
 
         return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
     }
 
-    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String {
+    override suspend fun modifyScriptChatHistory(
+        oldScript: String,
+        modifications: List<Modification<Element>>,
+        modelName: String,
+        systemPrompt: String
+    ): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
 
@@ -77,7 +97,12 @@ class ModificationDetectionService(
         return getModifiedScript(modelName, messages)
     }
 
-    override suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String {
+    override suspend fun modifyScriptChatHistory(
+        oldScript: String,
+        modifications: List<Modification<Element>>,
+        modelName: String,
+        messages: List<Message>
+    ): String {
         val locators = getLocators(modifications)
         val imports = getImports(oldScript)
 
@@ -86,6 +111,69 @@ class ModificationDetectionService(
         val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
 
         return getModifiedScript(modelName, updatedMessages)
+    }
+
+    override suspend fun modifyScriptChatHistoryV2(
+        oldScript: String,
+        missingElements: List<Element>,
+        modelName: String,
+        messages: List<Message>
+    ): String {
+        val imports = getImports(oldScript)
+
+        val request = ScraperUpdateRequestV2(
+            imports = imports,
+            script = oldScript,
+            newElements = missingElements
+        )
+
+        val updatedMessage = messages + Message(
+            role = "user",
+            content = Json.encodeToString(request)
+        )
+
+        return getModifiedScript(modelName, updatedMessage)
+    }
+
+    override suspend fun getMissingElementsFromScript(
+        scraperCode: String,
+        newElements: List<Element>,
+        system: String,
+        prompt: List<Message>
+    ): List<Element> {
+        val ollamaChatRequest = OllamaChatRequest(
+            model = elementExtractingModel,
+            stream = false,
+            raw = false,
+            messages = prompt
+        )
+        val message = Message(
+            role = "user",
+            content = """
+        <script>
+        $scraperCode
+        </script>
+        ```json
+        [
+            ${
+                newElements.joinToString(",\n") {
+                    """{"type": "${it.type}", "cssSelector": "${it.cssSelector}", "id": "${it.id}", "text": "${it.label}"}"""
+                }
+            }
+        ]
+        ```
+    """.trimIndent()
+        )
+
+        val ollamaChatResponse = llmClient.chat(ollamaChatRequest.copy(messages = ollamaChatRequest.messages + message))
+
+        val messageContent = ollamaChatResponse.message.content
+
+        if (messageContent.isNotBlank()) {
+            return Json.decodeFromString<List<Element>>(messageContent).distinctBy { it.id }
+        }
+
+        return listOf()
     }
 
     private suspend fun getModifiedScript(modelName: String, messages: List<Message>): String {
@@ -99,7 +187,11 @@ class ModificationDetectionService(
         return llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
     }
 
-    private suspend fun modifyScriptUnitary(scraperUpdateRequest: ScraperUpdateRequest, modelName: String, systemPrompt: String): String {
+    private suspend fun modifyScriptUnitary(
+        scraperUpdateRequest: ScraperUpdateRequest,
+        modelName: String,
+        systemPrompt: String
+    ): String {
         val ollamaRequest = OllamaGenerateRequest(
             model = modelName,
             system = systemPrompt,
@@ -116,7 +208,7 @@ class ModificationDetectionService(
     }
 
     private fun String.cleanUpdateScriptResponseJson(): String {
-         val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
+        val regex = Regex("""```kotlin\s*(.*?)\s*```""", RegexOption.DOT_MATCHES_ALL)
 
         val matchResult = regex.find(this)
         val code = matchResult?.groups?.get(1)?.value
@@ -129,7 +221,7 @@ class ModificationDetectionService(
     }
 
     private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
-        return modifications.map { m -> CssSelector(m.old.cssSelector, m.new.cssSelector) }
+        return modifications.map { m -> CssSelector(m.old.id, m.old.cssSelector, m.new.cssSelector, m.new.id) }
     }
 
     private fun String.extractAlternative(): String {

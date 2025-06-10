@@ -1,4 +1,4 @@
-package scrapers
+package scraper
 
 import Configurations
 import classes.data.BookingOption
@@ -13,6 +13,7 @@ import snapshots.ISnapshotService
 import steptracker.StepTracker
 import java.time.Duration
 
+
 class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
     override suspend fun scrape(): List<BookingOption> {
         try {
@@ -21,15 +22,14 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
             driver.get("http://localhost:5173/")
 
-            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button"))).click()
+            snapshotService.takeSnapshotAsFile(driver)
+            val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button")))
+            searchButton.click()
             StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver)
-
             val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
             StepTracker.incrementStep(identifier)
-
-            snapshotService.takeSnapshotAsFile(driver)
 
             val results = optionElements.map { BookingOption(it.text) }
 
@@ -41,7 +41,7 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
     }
 
     override fun getScraperData(): IScraperData = DemoScraperDataBundle(
-        path = Configurations.scrapersBaseDir + this::class.simpleName + ".kt",
+        path = Configurations.snapshotBaseDir + "stable/" + this::class.simpleName + ".kt",
         compiledClass = this
     )
 }

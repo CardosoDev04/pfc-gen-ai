@@ -1,5 +1,7 @@
 package persistence
 
+import java.io.File
+
 interface PersistenceService {
     /**
      * Writes the given content to a file representing the model.
@@ -35,4 +37,8 @@ interface PersistenceService {
     fun copyAndDeleteFile(from: String, to: String)
 
     fun copyWholeDirectory(from: String, to: String)
+
+    fun deleteAllContents(parentPath: String)
+
+    fun findLastCreatedDirectory(directoryPath: String): File?
 }

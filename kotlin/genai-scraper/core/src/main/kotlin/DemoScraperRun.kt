@@ -3,12 +3,12 @@ import com.cardoso.common.buildChromeDriver
 import html_fetcher.WebExtractor
 import kotlinx.coroutines.runBlocking
 import library.builder.ScraperBuilder
-import modification_detection.ModificationDetectionService
+import modification_detection.ModificationService
 import okhttp3.OkHttpClient
 import ollama.OllamaClient
 import persistence.implementations.FilePersistenceService
-import scrapers.DemoScraper
 import snapshots.SnapshotService
+import scraper.DemoScraper
 import java.util.concurrent.TimeUnit
 
 
@@ -24,12 +24,11 @@ fun main() {
             .writeTimeout(120, TimeUnit.SECONDS)
             .build()
         val llmClient = OllamaClient(httpClient)
-        val modificationDetectionService = ModificationDetectionService(llmClient, LLM.Gemma3_4B.modelName)
-
-        val initialScraper = DemoScraper(driver, snapshotService)
+        val modificationDetectionService = ModificationService(llmClient, LLM.Gemma3_4B.modelName, LLM.Mistral7B.modelName)
 
         val scraper = ScraperBuilder()
-            .withModel(LLM.CodeLlama7B)
+            .withScraper(DemoScraper(driver, snapshotService))
+            .withModel(LLM.Mistral7B)
             .withRetries(3)
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
@@ -37,7 +36,7 @@ fun main() {
             .withScraperTestClassName("DemoScraperTest")
             .withModificationDetectionService(modificationDetectionService)
             .withDriver(driver)
-            .build(initialScraper)
+            .build(DemoScraper::class)
 
         try {
             scraper.scrape()
