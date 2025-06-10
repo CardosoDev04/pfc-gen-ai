@@ -170,8 +170,9 @@ class ModificationService(
         val messageContent = ollamaChatResponse.message.content
 
         if (messageContent.isNotBlank()) {
-            return Json.decodeFromString(ListSerializer(Element.serializer()), messageContent)
+            return Json.decodeFromString<List<Element>>(messageContent).distinctBy { it.id }
         }
+
         return listOf()
     }
 
