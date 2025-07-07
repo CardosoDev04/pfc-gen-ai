@@ -151,7 +151,9 @@ class Scraper(
             webExtractor.getRelevantHTMLElements(scraperCorrectionBundle.stableHtmlSnapshot)
 
         val missingCssSelector = exceptionMessage.getLocatorFromException()
-        val missingElement = stableSnapshotHtmlElements.find { it.cssSelector == missingCssSelector }
+        val missingElement = stableSnapshotHtmlElements.find {
+            it.cssSelector == missingCssSelector || it.id == missingCssSelector.replace("#", "")
+        }
             ?: throw IllegalArgumentException("No element found with the provided CSS selector: $missingCssSelector")
 
         val latestSnapshotHtmlElements =
