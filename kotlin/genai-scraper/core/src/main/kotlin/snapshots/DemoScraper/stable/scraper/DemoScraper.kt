@@ -13,7 +13,6 @@ import snapshots.ISnapshotService
 import steptracker.StepTracker
 import java.time.Duration
 
-
 class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
     override suspend fun scrape(): List<BookingOption> {
         try {
@@ -23,12 +22,21 @@ class DemoScraper(private val driver: WebDriver, private val snapshotService: IS
             driver.get("http://localhost:5173/")
 
             snapshotService.takeSnapshotAsFile(driver)
-            val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button")))
+            val originInput = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#origin-input")))
+            originInput.sendKeys("New York")
+            StepTracker.incrementStep(identifier)
+
+            snapshotService.takeSnapshotAsFile(driver)
+            val destinationInput = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#destination-input")))
+            destinationInput.sendKeys("Los Angeles")
+            StepTracker.incrementStep(identifier)
+
+            val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#search-btn")))
             searchButton.click()
             StepTracker.incrementStep(identifier)
 
             snapshotService.takeSnapshotAsFile(driver)
-            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
+            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector("#item-title")))
             StepTracker.incrementStep(identifier)
 
             val results = optionElements.map { BookingOption(it.text) }

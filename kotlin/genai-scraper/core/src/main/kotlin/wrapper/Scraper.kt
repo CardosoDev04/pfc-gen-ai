@@ -150,16 +150,22 @@ class Scraper(
         val stableSnapshotHtmlElements =
             webExtractor.getRelevantHTMLElements(scraperCorrectionBundle.stableHtmlSnapshot)
 
+        val missingCssSelector = exceptionMessage.getLocatorFromException()
+        val missingElement = stableSnapshotHtmlElements.find { it.cssSelector == missingCssSelector }
+            ?: throw IllegalArgumentException("No element found with the provided CSS selector: $missingCssSelector")
+
         val latestSnapshotHtmlElements =
             webExtractor.getRelevantHTMLElements(scraperCorrectionBundle.latestHtmlSnapshot)
 
-        // TODO("Fix system prompt")
-        val notPresent = getMissingElements(stableSnapshotHtmlElements, latestSnapshotHtmlElements)
-        val alternatives = notPresent.map { getAlternative(it, latestSnapshotHtmlElements) }
+       val alternative = modificationService.getMissingElementAlternative(
+           latestSnapshotHtmlElements,
+           exceptionMessage,
+           missingElement
+       )
 
         val newScript = modificationService.modifyScriptChatHistoryV2(
             scraperCode,
-            alternatives,
+            listOf(alternative),
             model.modelName,
             FEW_SHOT_SCRAPER_UPDATE_MESSAGES
         )
@@ -190,6 +196,7 @@ class Scraper(
 
             is ScraperCorrectionResult.Success -> {
                 persistScraper()
+                persistenceService.deleteAllContents(latestBaseDir)
             }
         }
 
@@ -321,5 +328,14 @@ class Scraper(
     private fun persistScraper() {
         persistenceService.copyWholeDirectory(testScraperBaseDir, stableScraperBaseDir)
         persistenceService.deleteAllContents(testBaseDir)
+    }
+
+
+    private fun String.getLocatorFromException(): String {
+        val regex = """By\.\w+: (.+?)\s*(?=\(|$)""".toRegex()
+        val matchResult = regex.find(this)
+
+        return matchResult?.groupValues?.get(1)
+            ?: throw IllegalArgumentException("No locator found in the exception message")
     }
 }

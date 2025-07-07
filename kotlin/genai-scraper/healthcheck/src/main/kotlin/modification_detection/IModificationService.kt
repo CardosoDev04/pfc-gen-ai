@@ -24,37 +24,6 @@ interface IModificationService {
     suspend fun getModification(modifiedElement: Element, newElements: List<Element>): Modification<Element>
 
     /**
-     * Modifies the script based on a single modification using mistral.
-     *
-     * @param oldScript The old script.
-     * @param modification The modification to apply.
-     * @return The modified script.
-     */
-    suspend fun modifyMistralScript(oldScript: String, modification: Modification<Element>, modelName: String, systemPrompt: String): String
-
-    /**
-     * Modified the script based on a list of modifications using a chat history.
-     *
-     * @param oldScript The old script.
-     * @param modifications The list of modifications to apply.
-     * @param modelName The name of the model to use.
-     * @param systemPrompt The system prompt to feed to the model.
-     * @return The modified script.
-     */
-    suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, systemPrompt: String): String
-
-    /**
-     * Modified the script based on a list of modifications using a chat history.
-     *
-     * @param oldScript The old script.
-     * @param modifications The list of modifications to apply.
-     * @param modelName The name of the model to use.
-     * @param messages The messages simulating a conversation.
-     * @return The modified script.
-     */
-    suspend fun modifyScriptChatHistory(oldScript: String, modifications: List<Modification<Element>>, modelName: String, messages: List<Message>): String
-
-    /**
      * Modified the script based on a list of missing elements using a chat history.
      *
      * @param oldScript The old script.
@@ -75,4 +44,14 @@ interface IModificationService {
      * @return The list of elements of the script
      */
     suspend fun getMissingElementsFromScript(stableHtmlSnapshotElements: List<Element>, latestHtmlSnapshotElements: List<Element>, exceptionMessage: String, system: String, prompt: List<Message>): List<Element>
+
+    /**
+     * Gets an alternative element for a missing element based on the provided alternatives and the exception message.
+     *
+     * @param latestSnapshotHtmlElements The HTML elements from the latest snapshot.
+     * @param exceptionMessage The exception message indicating the missing element.
+     * @param missingElement The element that was expected but is missing.
+     * @return A modification containing the missing element and its alternative.
+     */
+    suspend fun getMissingElementAlternative(latestSnapshotHtmlElements: List<Element>, exceptionMessage: String, missingElement: Element): Modification<Element>
 }

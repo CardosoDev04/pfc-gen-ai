@@ -2,7 +2,7 @@ package domain.prompts
 
 import classes.llm.Message
 
-val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
+val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_REASONING_AND_EXCEPTION = listOf(
     Message(
         role = "user",
         content = """
@@ -11,7 +11,16 @@ val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
             Exception:
             org.openqa.selenium.NoSuchElementException: Unable to locate element using selector "#login-btn"
 
-            The scraper previously relied on a specific HTML element that no longer exists in the page. Below is a list of `Element` candidates extracted from the new HTML snapshot:
+            The scraper previously relied on the following element, which no longer exists in the page:
+            {
+              "type": "button",
+              "cssSelector": "#login-btn",
+              "text": "Login",
+              "id": "login-btn",
+              "label": "Login"
+            }
+
+            Below is a list of `Element` candidates extracted from the new HTML snapshot:
 
             [
               {
@@ -51,6 +60,7 @@ val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
     Message(
         role = "assistant",
         content = """
+            Reasoning: The original element was a button with ID "login-btn" and the text strongly suggests a login action. Among the candidates, the anchor tag with the text "Login" most closely matches in purpose and label.
             <BEGIN_ALTERNATIVE>
             {
               "type": "a",
@@ -69,6 +79,15 @@ val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
 
             Exception:
             org.openqa.selenium.NoSuchElementException: Element not found with selector "input[name='email']"
+
+            The scraper previously relied on the following element, which no longer exists in the page:
+            {
+              "type": "input",
+              "cssSelector": "input[name='email']",
+              "text": "",
+              "id": "",
+              "label": "Email"
+            }
 
             Elements:
             [
@@ -109,6 +128,7 @@ val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
     Message(
         role = "assistant",
         content = """
+            Reasoning: The original selector targeted an input named 'email'. The first candidate has ID "email-field" and a label of "Email Address", which directly suggests it replaced the original.
             <BEGIN_ALTERNATIVE>
             {
               "type": "input",
@@ -126,67 +146,18 @@ val FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION = listOf(
             The scraper encountered an error due to a missing HTML element.
 
             Exception:
-            org.openqa.selenium.NoSuchElementException: No element found matching "#checkout-button"
-
-            Elements:
-            [
-              {
-                "type": "button",
-                "cssSelector": ".btn-primary.checkout",
-                "text": "Proceed to Checkout",
-                "id": "",
-                "label": ""
-              },
-              {
-                "type": "button",
-                "cssSelector": "#continue-payment",
-                "text": "Continue",
-                "id": "continue-payment",
-                "label": "Payment"
-              },
-              {
-                "type": "a",
-                "cssSelector": "a[href='/checkout']",
-                "text": "Go to Checkout",
-                "id": "",
-                "label": ""
-              }
-            ]
-
-            Instructions:
-
-            You must analyze the provided elements and select the one that best matches the missing element the scraper used before the error.
-
-            Return only one element inside:
-
-            <BEGIN_ALTERNATIVE>
-            <your_json_selection_here>
-            </END_ALTERNATIVE>
-        """.trimIndent()
-    ),
-    Message(
-        role = "assistant",
-        content = """
-            <BEGIN_ALTERNATIVE>
-            {
-              "type": "button",
-              "cssSelector": ".btn-primary.checkout",
-              "text": "Proceed to Checkout",
-              "id": "",
-              "label": ""
-            }
-            </END_ALTERNATIVE>
-        """.trimIndent()
-    ),
-    Message(
-        role = "user",
-        content = """
-            The scraper encountered an error due to a missing HTML element.
-
-            Exception:
             org.openqa.selenium.NoSuchElementException: Unable to locate element using selector "button#apply-discount"
 
-            The scraper previously relied on a specific HTML element that no longer exists in the page. Below is a list of `Element` candidates extracted from the new HTML snapshot:
+            The scraper previously relied on the following element, which no longer exists in the page:
+            {
+              "type": "button",
+              "cssSelector": "button#apply-discount",
+              "text": "Apply Discount",
+              "id": "apply-discount",
+              "label": "Apply Discount"
+            }
+
+            Below is a list of `Element` candidates extracted from the new HTML snapshot:
 
             [
               {

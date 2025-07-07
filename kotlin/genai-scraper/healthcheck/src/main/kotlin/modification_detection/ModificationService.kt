@@ -10,7 +10,10 @@ import domain.modification.requests.ModificationRequest
 import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.requests.ScraperUpdateRequestV2
 import domain.modification.responses.ScraperUpdateResponse
-import domain.prompts.FEW_SHOT_GET_MODIFICATION_PROMPT
+import domain.prompts.FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION_SYSTEM_PROMPT
+import domain.prompts.FEW_SHOT_GET_MISSING_ELEMENTS_WITH_REASONING_AND_EXCEPTION
+import domain.prompts.FEW_SHOT_WITH_COT_GET_MODIFICATION_PROMPT
+import domain.templates.ELEMENT_RECOVERY_PROMPT_TEMPLATE
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -45,10 +48,10 @@ class ModificationService(
 
         val alternativeRequest = OllamaChatRequest(
             model = getModificationModel,
-            messages = FEW_SHOT_GET_MODIFICATION_PROMPT + Message(
-                role = "user",
-                content = modificationRequestJson
-            ),
+            messages =
+                FEW_SHOT_GET_MISSING_ELEMENTS_WITH_REASONING_AND_EXCEPTION
+                        + Message(role = "user", content = modificationRequestJson)
+                        + Message(role = "system", content = FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION_SYSTEM_PROMPT),
             stream = false,
             raw = false
         )
@@ -58,59 +61,6 @@ class ModificationService(
         val alternativeElement = Json.decodeFromString<Element>(alternativeResponseJson)
 
         return Modification(modifiedElement, alternativeElement)
-    }
-
-    override suspend fun modifyMistralScript(
-        oldScript: String,
-        modification: Modification<Element>,
-        modelName: String,
-        systemPrompt: String
-    ): String {
-        val cssSelector = CssSelector(
-            modification.old.id,
-            modification.old.cssSelector,
-            modification.new.cssSelector,
-            modification.new.id
-        )
-        val imports = getImports(oldScript)
-        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, listOf(cssSelector))
-
-        return modifyScriptUnitary(scraperUpdateRequest, modelName, systemPrompt)
-    }
-
-    override suspend fun modifyScriptChatHistory(
-        oldScript: String,
-        modifications: List<Modification<Element>>,
-        modelName: String,
-        systemPrompt: String
-    ): String {
-        val locators = getLocators(modifications)
-        val imports = getImports(oldScript)
-
-        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
-
-        val messages = listOf(
-            Message(role = "system", content = systemPrompt),
-            Message(role = "user", content = Json.encodeToString(scraperUpdateRequest))
-        )
-
-        return getModifiedScript(modelName, messages)
-    }
-
-    override suspend fun modifyScriptChatHistory(
-        oldScript: String,
-        modifications: List<Modification<Element>>,
-        modelName: String,
-        messages: List<Message>
-    ): String {
-        val locators = getLocators(modifications)
-        val imports = getImports(oldScript)
-
-        val scraperUpdateRequest = ScraperUpdateRequest(imports, oldScript, locators)
-
-        val updatedMessages = messages + Message("user", Json.encodeToString(scraperUpdateRequest))
-
-        return getModifiedScript(modelName, updatedMessages)
     }
 
     override suspend fun modifyScriptChatHistoryV2(
@@ -177,6 +127,32 @@ class ModificationService(
         return listOf()
     }
 
+    override suspend fun getMissingElementAlternative(
+        latestSnapshotHtmlElements: List<Element>,
+        exceptionMessage: String,
+        missingElement: Element
+    ): Modification<Element> {
+        val missingElementJson = Json.encodeToString(Element.serializer(), missingElement)
+        val newElementsJson = Json.encodeToString(ListSerializer(Element.serializer()), latestSnapshotHtmlElements)
+        val userPrompt = String.format(ELEMENT_RECOVERY_PROMPT_TEMPLATE, exceptionMessage, missingElementJson, newElementsJson)
+
+        val alternativeRequest = OllamaChatRequest(
+            model = getModificationModel,
+            messages =
+                FEW_SHOT_GET_MISSING_ELEMENTS_WITH_REASONING_AND_EXCEPTION
+                        + Message(role = "user", content = userPrompt)
+                        + Message(role = "system", content = FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION_SYSTEM_PROMPT),
+            stream = false,
+            raw = false
+        )
+
+        val uncleanedAlternativeResponse = llmClient.chat(alternativeRequest).message.content
+        val alternativeResponseJson = uncleanedAlternativeResponse.extractAlternative()
+        val alternativeElement = Json.decodeFromString<Element>(alternativeResponseJson)
+
+        return Modification(missingElement, alternativeElement)
+    }
+
     private suspend fun getModifiedScript(modelName: String, messages: List<Message>): String {
         val chatRequest = OllamaChatRequest(
             model = modelName,
@@ -186,26 +162,6 @@ class ModificationService(
         )
 
         return llmClient.chat(chatRequest).message.content.cleanUpdateScriptResponseJson()
-    }
-
-    private suspend fun modifyScriptUnitary(
-        scraperUpdateRequest: ScraperUpdateRequest,
-        modelName: String,
-        systemPrompt: String
-    ): String {
-        val ollamaRequest = OllamaGenerateRequest(
-            model = modelName,
-            system = systemPrompt,
-            prompt = Json.encodeToString(scraperUpdateRequest),
-            stream = false,
-            raw = false
-        )
-
-        val updateScriptResponseJson = llmClient.generate(ollamaRequest).response.cleanUpdateScriptResponseJson()
-
-        val updateScriptResponse = Json.decodeFromString<ScraperUpdateResponse>(updateScriptResponseJson)
-
-        return updateScriptResponse.updatedCode
     }
 
     private fun String.cleanUpdateScriptResponseJson(): String {
@@ -221,14 +177,18 @@ class ModificationService(
         return importsRegex.find(script)?.value ?: ""
     }
 
-    private fun getLocators(modifications: List<Modification<Element>>): List<CssSelector> {
-        return modifications.map { m -> CssSelector(m.old.id, m.old.cssSelector, m.new.cssSelector, m.new.id) }
-    }
-
     private fun String.extractAlternative(): String {
-        val regex = Regex("""<BEGIN_ALTERNATIVE>\s*(.*?)\s*<END_ALTERNATIVE>""", RegexOption.DOT_MATCHES_ALL)
-        val matchResult = regex.find(this)
-        return matchResult?.groups?.get(1)?.value
-            ?: throw IllegalArgumentException("No alternative found in the response")
+        val trimmed = this.trim()
+        val startTag = "<BEGIN_ALTERNATIVE>"
+        val endTag = "</END_ALTERNATIVE>"
+
+        val startIndex = trimmed.indexOf(startTag)
+        val endIndex = trimmed.indexOf(endTag)
+
+        if (startIndex == -1 || endIndex == -1 || startIndex + startTag.length >= endIndex) {
+            throw IllegalArgumentException("No alternative found in the response")
+        }
+
+        return this.substring(startIndex + startTag.length, endIndex).trim()
     }
 }

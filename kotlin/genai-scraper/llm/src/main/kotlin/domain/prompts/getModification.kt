@@ -2,7 +2,7 @@ package domain.prompts
 
 import classes.llm.Message
 
-val FEW_SHOT_GET_MODIFICATION_PROMPT = listOf(
+val FEW_SHOT_WITH_COT_GET_MODIFICATION_PROMPT = listOf(
     Message(
         "system", """
         You are an automation assistant tasked with selecting the best alternative HTML element from a list of alternatives based on similarity to a modified element.
