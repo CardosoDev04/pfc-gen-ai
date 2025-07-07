@@ -115,7 +115,7 @@ class ModificationService(
 
     override suspend fun modifyScriptChatHistoryV2(
         oldScript: String,
-        missingElements: List<Element>,
+        missingElements: List<Modification<Element>>,
         modelName: String,
         messages: List<Message>
     ): String {
@@ -136,42 +136,43 @@ class ModificationService(
     }
 
     override suspend fun getMissingElementsFromScript(
-        scraperCode: String,
-        newElements: List<Element>,
+        stableHtmlSnapshotElements: List<Element>,
+        latestHtmlSnapshotElements: List<Element>,
+        exceptionMessage: String,
         system: String,
         prompt: List<Message>
     ): List<Element> {
-        val ollamaChatRequest = OllamaChatRequest(
-            model = elementExtractingModel,
-            stream = false,
-            raw = false,
-            messages = prompt
-        )
-        val message = Message(
-            role = "user",
-            content = """
-        <script>
-        $scraperCode
-        </script>
-        ```json
-        [
-            ${
-                newElements.joinToString(",\n") {
-                    """{"type": "${it.type}", "cssSelector": "${it.cssSelector}", "id": "${it.id}", "text": "${it.label}"}"""
-                }
-            }
-        ]
-        ```
-    """.trimIndent()
-        )
+//        val ollamaChatRequest = OllamaChatRequest(
+//            model = elementExtractingModel,
+//            stream = false,
+//            raw = false,
+//            messages = prompt
+//        )
+//        val message = Message(
+//            role = "user",
+//            content = """
+//        <script>
+//        $scraperCode
+//        </script>
+//        ```json
+//        [
+//            ${
+//                newElements.joinToString(",\n") {
+//                    """{"type": "${it.type}", "cssSelector": "${it.cssSelector}", "id": "${it.id}", "text": "${it.label}"}"""
+//                }
+//            }
+//        ]
+//        ```
+//    """.trimIndent()
+//        )
 
-        val ollamaChatResponse = llmClient.chat(ollamaChatRequest.copy(messages = ollamaChatRequest.messages + message))
-
-        val messageContent = ollamaChatResponse.message.content
-
-        if (messageContent.isNotBlank()) {
-            return Json.decodeFromString<List<Element>>(messageContent).distinctBy { it.id }
-        }
+//        val ollamaChatResponse = llmClient.chat(ollamaChatRequest.copy(messages = ollamaChatRequest.messages + message))
+//
+//        val messageContent = ollamaChatResponse.message.content
+//
+//        if (messageContent.isNotBlank()) {
+//            return Json.decodeFromString<List<Element>>(messageContent).distinctBy { it.id }
+//        }
 
         return listOf()
     }

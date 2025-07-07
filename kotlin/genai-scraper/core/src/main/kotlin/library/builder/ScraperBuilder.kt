@@ -17,7 +17,6 @@ class ScraperBuilder {
     private var snapshotService: ISnapshotService? = null
     private var webExtractor: WebExtractor? = null
     private var persistenceService: PersistenceService? = null
-    private var scraperTestClassName: String? = null
     private var retries: Int = 3
     private var model: LLM = LLM.Mistral7B
     private var driver: WebDriver? = null
@@ -40,10 +39,6 @@ class ScraperBuilder {
 
     fun withPersistenceService(service: PersistenceService) = apply {
         this.persistenceService = service
-    }
-
-    fun withScraperTestClassName(name: String) = apply {
-        this.scraperTestClassName = name
     }
 
     fun withRetries(retries: Int) = apply {

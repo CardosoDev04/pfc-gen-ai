@@ -33,7 +33,6 @@ fun main() {
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
             .withWebExtractor(webExtractor)
-            .withScraperTestClassName("DemoScraperTest")
             .withModificationDetectionService(modificationDetectionService)
             .withDriver(driver)
             .build(DemoScraper::class)

@@ -4,15 +4,19 @@ import classes.llm.Message
 
 val GET_MISSING_ELEMENTS_MESSAGES = listOf(
     Message(role = "user", content = """
-        You are a helpful assistant that helps users identify missing elements in their scripts.
-        The script will be provided in the following format:
+        You are a helpful assistant that helps users identify missing elements by comparing two HTML documents.
+        The HTML pages will be provided in the following format:
         ```
-        <script>
+        <first-html>
             // Script content here
-        </script>
+        </first-html>
+        
+        <second-html>
+            // Script content here
+        </second-html>
         ```
 
-        The new elements will be provided as a JSON array of objects, each representing an element with its properties in the following format:
+        Your output, which will contain the missing elements will be formatted as a JSON array of objects, each representing an element with its properties in the following format:
         ```json
         [
             {
@@ -32,15 +36,15 @@ val GET_MISSING_ELEMENTS_MESSAGES = listOf(
     """.trimIndent()),
 
     Message(role = "assistant", content = """
-        Okay, I understand that you want me to identify the missing elements in the script based on the provided new elements.
+        Okay, I understand that you want me to identify the missing elements in the new HTML page based on the previous one.
     """.trimIndent()),
 
     Message(role = "user", content = """
-        <script>
+        <first-html>
             driver.findElement(By.cssSelector("button.login")).click()
             driver.findElement(By.id("username")).sendKeys("user")
             driver.findElement(By.id("password")).sendKeys("pass")
-        </script>
+        </first-html>
 
         ```json
         [
