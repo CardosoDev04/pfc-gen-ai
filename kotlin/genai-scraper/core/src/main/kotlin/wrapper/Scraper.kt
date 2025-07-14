@@ -1,11 +1,9 @@
 package wrapper
 
 import Configurations
-import classes.data.Element
 import classes.llm.LLM
 import classes.scrapers.ScraperCorrection
 import classes.scrapers.ScraperCorrectionBundle
-import classes.service_model.Modification
 import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
@@ -229,27 +227,6 @@ class Scraper(
 
             return ScraperCorrectionBundle(stableHtmlSnapshot, latestHtmlSnapshot, scraperCode)
         }
-    }
-
-    private fun getMissingElements(
-        stableHtmlSnapshotElements: List<Element>,
-        latestHtmlSnapshotElements: List<Element>
-    ): List<Element> {
-        /**
-         * Return elements that are in the new snapshot but are not in the stable one
-         */
-
-        return latestHtmlSnapshotElements.filter { elem -> !stableHtmlSnapshotElements.contains(elem) }
-    }
-
-    private suspend fun getAlternative(
-        missingElement: Element,
-        htmlRelevantElements: List<Element>
-    ): Modification<Element> {
-        /**
-         * Use an LLM to find the best alternative given the missing elements and the new relevant elements from the html
-         */
-        return modificationService.getModification(missingElement, htmlRelevantElements)
     }
 
     /**
