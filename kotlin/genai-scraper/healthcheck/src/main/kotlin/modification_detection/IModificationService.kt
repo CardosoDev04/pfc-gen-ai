@@ -35,17 +35,6 @@ interface IModificationService {
     suspend fun modifyScriptChatHistoryV2(oldScript: String, missingElements: List<Modification<Element>>, modelName: String, messages: List<Message>): String
 
     /**
-     * Get elements interacted with in the scraper that are not present in the new HTML state.
-     *
-     * @param stableHtmlSnapshotElements The elements found in the stable snapshot
-     * @param latestHtmlSnapshotElements The new elements to compare against
-     * @param system The system prompt to use
-     * @param prompt The prompt to use
-     * @return The list of elements of the script
-     */
-    suspend fun getMissingElementsFromScript(stableHtmlSnapshotElements: List<Element>, latestHtmlSnapshotElements: List<Element>, exceptionMessage: String, system: String, prompt: List<Message>): List<Element>
-
-    /**
      * Gets an alternative element for a missing element based on the provided alternatives and the exception message.
      *
      * @param latestSnapshotHtmlElements The HTML elements from the latest snapshot.

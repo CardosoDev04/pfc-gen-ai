@@ -45,7 +45,7 @@ class ScraperBuilder {
         this.retries = retries
     }
 
-    fun withModel(model: LLM) = apply {
+    fun withScriptRepairModel(model: LLM) = apply {
         this.model = model
     }
 

@@ -2,17 +2,12 @@ package modification_detection
 
 import classes.data.Element
 import classes.llm.Message
-import classes.service_model.CssSelector
 import classes.service_model.Modification
 import domain.http.ollama.requests.OllamaChatRequest
-import domain.http.ollama.requests.OllamaGenerateRequest
 import domain.modification.requests.ModificationRequest
-import domain.modification.requests.ScraperUpdateRequest
 import domain.modification.requests.ScraperUpdateRequestV2
-import domain.modification.responses.ScraperUpdateResponse
 import domain.prompts.FEW_SHOT_GET_MISSING_ELEMENTS_WITH_EXCEPTION_SYSTEM_PROMPT
 import domain.prompts.FEW_SHOT_GET_MISSING_ELEMENTS_WITH_REASONING_AND_EXCEPTION
-import domain.prompts.FEW_SHOT_WITH_COT_GET_MODIFICATION_PROMPT
 import domain.templates.ELEMENT_RECOVERY_PROMPT_TEMPLATE
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
@@ -27,7 +22,6 @@ import ollama.ILLMClient
 class ModificationService(
     private val llmClient: ILLMClient,
     private val getModificationModel: String,
-    private val elementExtractingModel: String
 ) : IModificationService {
     override suspend fun getMissingElements(
         previousElements: List<Element>,
@@ -83,48 +77,6 @@ class ModificationService(
         )
 
         return getModifiedScript(modelName, updatedMessage)
-    }
-
-    override suspend fun getMissingElementsFromScript(
-        stableHtmlSnapshotElements: List<Element>,
-        latestHtmlSnapshotElements: List<Element>,
-        exceptionMessage: String,
-        system: String,
-        prompt: List<Message>
-    ): List<Element> {
-//        val ollamaChatRequest = OllamaChatRequest(
-//            model = elementExtractingModel,
-//            stream = false,
-//            raw = false,
-//            messages = prompt
-//        )
-//        val message = Message(
-//            role = "user",
-//            content = """
-//        <script>
-//        $scraperCode
-//        </script>
-//        ```json
-//        [
-//            ${
-//                newElements.joinToString(",\n") {
-//                    """{"type": "${it.type}", "cssSelector": "${it.cssSelector}", "id": "${it.id}", "text": "${it.label}"}"""
-//                }
-//            }
-//        ]
-//        ```
-//    """.trimIndent()
-//        )
-
-//        val ollamaChatResponse = llmClient.chat(ollamaChatRequest.copy(messages = ollamaChatRequest.messages + message))
-//
-//        val messageContent = ollamaChatResponse.message.content
-//
-//        if (messageContent.isNotBlank()) {
-//            return Json.decodeFromString<List<Element>>(messageContent).distinctBy { it.id }
-//        }
-
-        return listOf()
     }
 
     override suspend fun getMissingElementAlternative(

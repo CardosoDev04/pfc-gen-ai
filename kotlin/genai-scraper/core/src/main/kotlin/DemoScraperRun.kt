@@ -24,11 +24,11 @@ fun main() {
             .writeTimeout(120, TimeUnit.SECONDS)
             .build()
         val llmClient = OllamaClient(httpClient)
-        val modificationDetectionService = ModificationService(llmClient, LLM.Gemma3_4B.modelName, LLM.Mistral7B.modelName)
+        val modificationDetectionService = ModificationService(llmClient, LLM.Gemma3_12B.modelName)
 
         val scraper = ScraperBuilder()
             .withScraper(DemoScraper(driver, snapshotService))
-            .withModel(LLM.Gemma3_12B)
+            .withScriptRepairModel(LLM.Gemma3_12B)
             .withRetries(3)
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
