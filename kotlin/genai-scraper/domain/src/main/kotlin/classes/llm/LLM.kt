@@ -7,4 +7,6 @@ enum class LLM(val modelName: String) {
     DeepSeekCoder1Point3B("deepseek-coder:1.3b"),
     Gemma3_1B("gemma3:1b"),
     Gemma3_4B("gemma3:4b"),
+    CodeQwen("codeqwen:latest"),
+    Gemma3_12B("gemma3:12b"),
 }

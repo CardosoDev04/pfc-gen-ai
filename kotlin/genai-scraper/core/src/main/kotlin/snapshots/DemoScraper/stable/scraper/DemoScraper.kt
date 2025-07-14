@@ -13,31 +13,36 @@ import snapshots.ISnapshotService
 import steptracker.StepTracker
 import java.time.Duration
 
-
 class DemoScraper(private val driver: WebDriver, private val snapshotService: ISnapshotService) : IScraper {
     override suspend fun scrape(): List<BookingOption> {
-        try {
-            val identifier = StepTracker.initializeRun()
+        val identifier = StepTracker.initializeRun()
 
-            val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
-            driver.get("http://localhost:5173/")
+        val webDriverWait = WebDriverWait(driver, Duration.ofSeconds(5))
+        driver.get("http://localhost:5173/")
 
-            snapshotService.takeSnapshotAsFile(driver)
-            val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("search-button")))
-            searchButton.click()
-            StepTracker.incrementStep(identifier)
+        snapshotService.takeSnapshotAsFile(driver)
+        val originInput = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#origin-input")))
+        originInput.sendKeys("New York")
+        StepTracker.incrementStep(identifier)
 
-            snapshotService.takeSnapshotAsFile(driver)
-            val optionElements = webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.id("item-title")))
-            StepTracker.incrementStep(identifier)
+        snapshotService.takeSnapshotAsFile(driver)
+        val destinationInput =
+            webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#destination-input")))
+        destinationInput.sendKeys("Los Angeles")
+        StepTracker.incrementStep(identifier)
 
-            val results = optionElements.map { BookingOption(it.text) }
+        val searchButton = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#search-button")))
+        searchButton.click()
+        StepTracker.incrementStep(identifier)
 
-            return results
-        } catch (e: Exception) {
-            snapshotService.takeSnapshotAsFile(driver)
-            throw e
-        }
+        snapshotService.takeSnapshotAsFile(driver)
+        val optionElements =
+            webDriverWait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector("h1#item-titulo")))
+        StepTracker.incrementStep(identifier)
+
+        val results = optionElements.map { BookingOption(it.text) }
+
+        return results
     }
 
     override fun getScraperData(): IScraperData = DemoScraperDataBundle(

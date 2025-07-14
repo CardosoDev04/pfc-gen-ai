@@ -28,12 +28,11 @@ fun main() {
 
         val scraper = ScraperBuilder()
             .withScraper(DemoScraper(driver, snapshotService))
-            .withModel(LLM.Mistral7B)
+            .withModel(LLM.Gemma3_12B)
             .withRetries(3)
             .withSnapshotService(snapshotService)
             .withPersistenceService(persistenceService)
             .withWebExtractor(webExtractor)
-            .withScraperTestClassName("DemoScraperTest")
             .withModificationDetectionService(modificationDetectionService)
             .withDriver(driver)
             .build(DemoScraper::class)

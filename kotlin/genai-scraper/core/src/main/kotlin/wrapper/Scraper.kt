@@ -4,13 +4,12 @@ import Configurations
 import classes.data.Element
 import classes.llm.LLM
 import classes.scrapers.ScraperCorrection
+import classes.scrapers.ScraperCorrectionBundle
 import classes.service_model.Modification
 import compiler.CompiledScraperResult
 import compiler.ScraperCompiler
 import domain.model.interfaces.IScraperWrapper
 import domain.prompts.FEW_SHOT_SCRAPER_UPDATE_MESSAGES
-import domain.prompts.GET_MISSING_ELEMENTS_MESSAGES
-import domain.prompts.GET_MISSING_ELEMENTS_SYSTEM_PROMPT
 import enums.ScraperCorrectionResult
 import html_fetcher.WebExtractor
 import interfaces.IScraper
@@ -19,7 +18,6 @@ import org.openqa.selenium.*
 import persistence.PersistenceService
 import snapshots.ISnapshotService
 import java.io.File
-import java.lang.reflect.Method
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
@@ -82,7 +80,7 @@ class Scraper(
             if (seleniumExceptionTypes.any { it.isInstance(e) }) {
                 println("Scraping exception occurred: ${e.message}. Trying to correct...")
                 snapshotService.isFirstRun = false
-                return attemptCorrectingScraper()
+                return attemptCorrectingScraper(e.message ?: "")
             }
 
             throw e
@@ -95,21 +93,27 @@ class Scraper(
         persistenceService.write("$latestScraperBaseDir/${scraperKlass.simpleName}.kt", scraperCode)
     }
 
-    private suspend fun attemptCorrectingScraper(): Any {
+    private suspend fun attemptCorrectingScraper(exceptionMessage: String): Any {
         var retries = 0
+        var currExceptionMessage = exceptionMessage
 
         while (retries < maxRetries) {
             try {
                 snapshotService.resetCounter()
-                val correctionResult = correctScraper()
+                when (val correctionResult = correctScraper(currExceptionMessage)) {
+                    is ScraperCorrectionResult.Success -> {
+                        return correctionResult.result
+                    }
 
-                if (correctionResult is ScraperCorrectionResult.Success) {
-                    return correctionResult.correctedScraper.scrape()
-                } else if (correctionResult is ScraperCorrectionResult.Failure) {
-                    retries++
+                    is ScraperCorrectionResult.Failure -> {
+                        retries++
+                    }
+
+                    is ScraperCorrectionResult.PartialFix -> {
+                        currExceptionMessage = correctionResult.exceptionMessage
+                    }
                 }
-            }
-            catch (e: Exception) {
+            } catch (e: Exception) {
                 println("The following exception was thrown while fixing scraper: ${e.message}")
                 retries++
             }
@@ -123,7 +127,7 @@ class Scraper(
         throw Exception("Unable to correct scraper.")
     }
 
-    private suspend fun correctScraper(): ScraperCorrectionResult {
+    private suspend fun correctScraper(exceptionMessage: String): ScraperCorrectionResult {
         /**
          * Call getMissingElements
          * Get alternative for each missing element
@@ -140,14 +144,30 @@ class Scraper(
          *      - Otherwise
          *          - Revert to the last correction result if there is any, otherwise, revert to the original code and retry
          */
+        val scraperCorrectionBundle = getScraperCorrectionBundle()
 
-        val (scraperCode, htmlCode) = getHtmlAndScraperCode()
-        val htmlElements = webExtractor.getRelevantHTMLElements(htmlCode)
-        val notPresent = getMissingElements(scraperCode, htmlElements)
+        val scraperCode = scraperCorrectionBundle.scraperCode
+        val stableSnapshotHtmlElements =
+            webExtractor.getRelevantHTMLElements(scraperCorrectionBundle.stableHtmlSnapshot)
+
+        val missingCssSelector = exceptionMessage.getLocatorFromException()
+        val missingElement = stableSnapshotHtmlElements.find {
+            it.cssSelector == missingCssSelector || it.id == missingCssSelector.replace("#", "")
+        }
+            ?: throw IllegalArgumentException("No element found with the provided CSS selector: $missingCssSelector")
+
+        val latestSnapshotHtmlElements =
+            webExtractor.getRelevantHTMLElements(scraperCorrectionBundle.latestHtmlSnapshot)
+
+       val alternative = modificationService.getMissingElementAlternative(
+           latestSnapshotHtmlElements,
+           exceptionMessage,
+           missingElement
+       )
 
         val newScript = modificationService.modifyScriptChatHistoryV2(
             scraperCode,
-            notPresent,
+            listOf(alternative),
             model.modelName,
             FEW_SHOT_SCRAPER_UPDATE_MESSAGES
         )
@@ -175,43 +195,51 @@ class Scraper(
                 scraperCorrectionHistory.add(ScraperCorrection(newScript, stepsAchieved))
                 persistenceService.copyWholeDirectory(testBaseDir, latestBaseDir)
             }
+
             is ScraperCorrectionResult.Success -> {
                 persistScraper()
+                persistenceService.deleteAllContents(latestBaseDir)
             }
         }
 
         return testResult
     }
 
-    private fun getHtmlAndScraperCode(): Pair<String, String> {
+    private fun getScraperCorrectionBundle(): ScraperCorrectionBundle {
         /**
-         * - If scraperCorrectionHistory is empty get scraper and html code from the latest directory
-         *      - Get html code latest directory and scraper code from the stable directory
-         * - Otherwise
-         *      - Get html from test directory and last correction result scraper code
+         * - If scraperCorrectionHistory is empty get html code from the latest directory
+         *      - Get latest html code from the latest directory
+         * - Else
+         *      - Get html code from the test directory
+         * - Get the corresponding step's HTML from the stable directory
          */
         val lastAchievedStep = persistenceService.findLastCreatedDirectory("$latestBaseDir/steps")?.name?.toInt()
             ?: throw IllegalStateException("Latest steps directory not found")
 
+        val stableHtmlSnapshot = persistenceService.read("$stableBaseDir/steps/$lastAchievedStep/html/index.html")
+
         if (scraperCorrectionHistory.isEmpty()) {
-            val scraperCode = persistenceService.read("$stableScraperBaseDir/${scraperKlass.simpleName}.kt")
-            val htmlCode = persistenceService.read("$latestBaseDir/steps/$lastAchievedStep/html/index.html")
-            return Pair(scraperCode, htmlCode)
+            val latestHtmlSnapshot = persistenceService.read("$latestBaseDir/steps/$lastAchievedStep/html/index.html")
+            val scraperCode = persistenceService.read("$latestScraperBaseDir/${scraperKlass.simpleName}.kt")
+
+            return ScraperCorrectionBundle(stableHtmlSnapshot, latestHtmlSnapshot, scraperCode)
+        } else {
+            val latestHtmlSnapshot = persistenceService.read("$testBaseDir/steps/$lastAchievedStep/html/index.html")
+            val scraperCode = persistenceService.read("$testScraperBaseDir/${scraperKlass.simpleName}.kt")
+
+            return ScraperCorrectionBundle(stableHtmlSnapshot, latestHtmlSnapshot, scraperCode)
         }
-
-        val scraperCode = scraperCorrectionHistory.last().code
-        val htmlCode = persistenceService.read("$testBaseDir/steps/$lastAchievedStep/html/index.html")
-
-        return Pair(scraperCode, htmlCode)
     }
 
-    private suspend fun getMissingElements(scraperCode: String, htmlElements: List<Element>): List<Element> {
-        return modificationService.getMissingElementsFromScript(
-            scraperCode,
-            htmlElements,
-            GET_MISSING_ELEMENTS_SYSTEM_PROMPT,
-            GET_MISSING_ELEMENTS_MESSAGES
-        )
+    private fun getMissingElements(
+        stableHtmlSnapshotElements: List<Element>,
+        latestHtmlSnapshotElements: List<Element>
+    ): List<Element> {
+        /**
+         * Return elements that are in the new snapshot but are not in the stable one
+         */
+
+        return latestHtmlSnapshotElements.filter { elem -> !stableHtmlSnapshotElements.contains(elem) }
     }
 
     private suspend fun getAlternative(
@@ -263,56 +291,21 @@ class Scraper(
         return compileResult
     }
 
-    private fun testScraper(scraperResult: CompiledScraperResult): ScraperCorrectionResult {
-        println("Testing scraper...")
+    private suspend fun testScraper(scraperResult: CompiledScraperResult): ScraperCorrectionResult {
+        try {
+            val result = scraperResult.scraperInstance.scrape()
 
-        val testInstance = scraperResult.testInstance
-        val testClass = testInstance::class
-
-        getSetUpMethods(testClass).forEach { it.invoke(testInstance) }
-
-        val testMethods = testClass.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java)
-        }
-
-        var failedTests = 0
-
-        for (method in testMethods) {
-            try {
-                println("Running test: ${method.name}")
-                method.invoke(testInstance)
-            } catch (e: Exception) {
-                failedTests++
-                println("Test failed: ${method.name}")
-                println(e.cause?.message?.substringBefore("Build info:"))
-                println(e.printStackTrace())
-            }
-        }
-
-        getTearDownMethods(testClass).forEach { it.invoke(testInstance) }
-
-        if (failedTests > 0) {
+            return ScraperCorrectionResult.Success(result)
+        } catch (e: Exception) {
             val (lastRunSteps, currentRunSteps) = getStepsAchieved()
 
             if (currentRunSteps > lastRunSteps) {
-                return ScraperCorrectionResult.PartialFix(currentRunSteps)
+                return ScraperCorrectionResult.PartialFix(currentRunSteps, e.message ?: "")
             }
 
             return ScraperCorrectionResult.Failure
         }
-
-        return ScraperCorrectionResult.Success(scraperResult.scraperInstance)
     }
-
-    private fun getTearDownMethods(clazz: KClass<*>): List<Method> =
-        clazz.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.AfterAll::class.java)
-        }
-
-    private fun getSetUpMethods(clazz: KClass<*>): List<Method> =
-        clazz.java.methods.filter {
-            it.isAnnotationPresent(org.junit.jupiter.api.BeforeAll::class.java)
-        }
 
     private fun getStepsAchieved(): Pair<Int, Int> {
         /**
@@ -337,5 +330,14 @@ class Scraper(
     private fun persistScraper() {
         persistenceService.copyWholeDirectory(testScraperBaseDir, stableScraperBaseDir)
         persistenceService.deleteAllContents(testBaseDir)
+    }
+
+
+    private fun String.getLocatorFromException(): String {
+        val regex = """By\.\w+: (.+?)\s*(?=\(|$)""".toRegex()
+        val matchResult = regex.find(this)
+
+        return matchResult?.groupValues?.get(1)
+            ?: throw IllegalArgumentException("No locator found in the exception message")
     }
 }
